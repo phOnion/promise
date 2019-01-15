@@ -139,12 +139,9 @@ class Promise implements
 
     private function handleResult(&$result)
     {
-        if ($result instanceof self) {
-            $this->state = $result->getState();
-        }
-
         if (is_thenable($result)) {
             try {
+                $this->state = self::PENDING;
                 $result->then(function ($value) {
                     $this->resolve($value);
                 }, function ($reason) {
@@ -157,8 +154,12 @@ class Promise implements
             return true;
         }
 
+        if ($result instanceof self) {
+            $this->state = $result->getState();
+        }
+
         if ($result instanceof \Closure) {
-            $result = $result(function ($value) {
+            $this->value = $result(function ($value) {
                 if (!$this->isPending()) {
                     $this->resolve($value);
                 }
@@ -174,15 +175,16 @@ class Promise implements
 
     public function then(?Closure $onFulfilled = null, ?Closure $onRejected = null): ThenableInterface
     {
+        $self = clone $this;
         try {
-            if ($this->isFulfilled()) {
-                $this->value = $onFulfilled($this->value) ?? $this->value;
-                $this->handleResult($this->value);
+            if ($self->isFulfilled()) {
+                $self->value = $onFulfilled($self->value) ?? $self->value;
+                $self->handleResult($self->value);
 
-                return $this;
+                return $self;
             }
 
-            $self = clone $this;
+
             if ($onRejected !== null) {
                 $self = $self->otherwise($onRejected);
             }
