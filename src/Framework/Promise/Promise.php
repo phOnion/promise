@@ -86,10 +86,14 @@ class Promise implements
         }
     }
 
-    public function wait()
+    public function await()
     {
         if ($this->isPending() && $this->waitFn instanceof Closure) {
             ($this->waitFn)();
+        }
+
+        if ($this->value instanceof WaitableInterface) {
+            return $this->value->await();
         }
 
         if ($this->isFulfilled()) {
