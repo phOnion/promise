@@ -92,10 +92,6 @@ class Promise implements
             ($this->waitFn)();
         }
 
-        if ($this->value instanceof WaitableInterface) {
-            return $this->value->await();
-        }
-
         if ($this->isFulfilled()) {
             return $this->value;
         }
@@ -109,7 +105,7 @@ class Promise implements
 
     private function settle(string $state, \SplQueue $queue, $result)
     {
-        if ($this->state !== self::PENDING) {
+        if (!$this->isPending()) {
             throw new \LogicException("Promise already {$this->getState()}");
         }
         $this->value = $result;
@@ -144,8 +140,12 @@ class Promise implements
     private function handleResult(&$result)
     {
         if (is_thenable($result)) {
+            $this->state = self::PENDING;
+            if ($result instanceof self) {
+                $this->state = $result->getState();
+            }
+
             try {
-                $this->state = self::PENDING;
                 $result->then(function ($value) {
                     $this->resolve($value);
                 }, function ($reason) {
@@ -158,12 +158,8 @@ class Promise implements
             return true;
         }
 
-        if ($result instanceof self) {
-            $this->state = $result->getState();
-        }
-
         if ($result instanceof \Closure) {
-            $this->value = $result(function ($value) {
+            $result = $result(function ($value) {
                 if (!$this->isPending()) {
                     $this->resolve($value);
                 }
@@ -179,30 +175,28 @@ class Promise implements
 
     public function then(?Closure $onFulfilled = null, ?Closure $onRejected = null): ThenableInterface
     {
-        $self = clone $this;
         try {
-            if ($self->isFulfilled()) {
-                $self->value = $onFulfilled($self->value) ?? $self->value;
-                $self->handleResult($self->value);
+            if ($this->isFulfilled()) {
+                $this->value = $onFulfilled($this->value) ?? $this->value;
+                $this->handleResult($this->value);
 
-                return $self;
+                return $this;
             }
 
-
             if ($onRejected !== null) {
-                $self = $self->otherwise($onRejected);
+                $this->otherwise($onRejected);
             }
 
             if ($onFulfilled) {
-                $self->fulfilledQueue->enqueue($onFulfilled);
+                $this->fulfilledQueue->enqueue($onFulfilled);
             }
         } catch (\Throwable $ex) {
-            if ($self->isPending()) {
-                $self->reject($ex);
+            if ($this->isPending()) {
+                $this->reject($ex);
             }
         }
 
-        return $self;
+        return $this;
     }
 
     public function otherwise(Closure $onRejected): PromiseInterface
@@ -213,30 +207,27 @@ class Promise implements
             $this->handleResult($this->value);
             return $this;
         }
-        $self = clone $this;
 
-        $self->rejectedQueue->enqueue($onRejected);
+        $this->rejectedQueue->enqueue($onRejected);
 
-        return $self;
+        return $this;
     }
 
     public function finally(Closure ...$callback): PromiseInterface
     {
-        $self = clone $this;
-
-        if (!$self->isPending()) {
+        if (!$this->isPending()) {
             foreach ($callback as $cb) {
                 $cb();
             }
 
-            return $self;
+            return $this;
         }
 
         foreach ($callback as $cb) {
-            $self->finallyQueue->enqueue($cb);
+            $this->finallyQueue->enqueue($cb);
         }
 
-        return $self;
+        return $this;
     }
 
     private function getState(): string
