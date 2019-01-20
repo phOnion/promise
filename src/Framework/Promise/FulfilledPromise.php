@@ -5,7 +5,8 @@ class FulfilledPromise extends Promise
 {
     public function __construct($value)
     {
-        parent::__construct();
-        $this->resolve($value);
+        parent::__construct(function ($resolve, $reject) use ($value) {
+            $resolve($value);
+        });
     }
 }
