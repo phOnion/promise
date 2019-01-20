@@ -5,15 +5,14 @@ namespace Promise\Tests;
 
 use Exception;
 use Onion\Framework\Promise\Promise;
+use Onion\Framework\Promise\FulfilledPromise;
+use Onion\Framework\Promise\RejectedPromise;
 
 class PromiseTest extends \PHPUnit\Framework\TestCase
 {
     public function testSuccess()
     {
-        $promise = new Promise();
-        $promise->resolve(1);
-
-        $this->assertEquals(3, $promise->then(function ($value) {
+        $this->assertEquals(3, (new FulfilledPromise(1))->then(function ($value) {
             return $value + 2;
         })->await());
     }
@@ -24,21 +23,16 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
      */
     public function testFail()
     {
-        $promise = new Promise();
-        $promise->reject(new Exception('1'));
-
-        $promise->then(null, function ($value) {
-            return $value->getMessage() + 2;
-        })->await();
+        (new RejectedPromise(new Exception('1')))
+            ->then(null, function ($value) {
+                return $value;
+            })->await();
 
     }
 
     public function testChain()
     {
-        $promise = new Promise();
-        $promise->resolve(1);
-
-        $this->assertEquals(7, $promise->then(function ($value) {
+        $this->assertEquals(7, (new FulfilledPromise(1))->then(function ($value) {
             return $value + 2;
         })->then(function ($value) {
             return $value + 4;
@@ -47,32 +41,20 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
 
     public function testChainPromise()
     {
-        $subPromise = new Promise();
-
-        $promise = new Promise(null, function () use (&$subPromise) {
-            $subPromise->resolve(2);
-        });
-        $promise->resolve(1);
-
-        $promise = $promise->then(function ($value) use (&$subPromise) {
-            return $subPromise;
+        $promise = (new FulfilledPromise(1))->then(function ($value) {
+            return new FulfilledPromise(2);
         })->then(function ($value) {
             return ($value + 4);
         });
 
-        $this->assertTrue($subPromise->isPending());
-        $this->assertTrue($promise->isPending());
-        // $subPromise->resolve(2);
         $this->assertEquals(6, $promise->await());
     }
 
     public function testChainCallback()
     {
         $finalValue = 0;
-        $promise = new Promise();
-        $promise->resolve(1);
 
-        $promise = $promise->then(function ($value) use (&$finalValue) {
+        (new FulfilledPromise(1))->then(function ($value) use (&$finalValue) {
             $finalValue = $value + 2;
 
             return $finalValue;
@@ -89,10 +71,7 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
 
     public function testChainThenable()
     {
-        $promise = new Promise();
-        $promise->resolve(1);
-
-        $promise = $promise->then(function ($value) {
+        $promise = (new FulfilledPromise(1))->then(function ($value) {
             return $value + 2;
         })->then(function ($value) use (&$thenable) {
             return new class($value) {
@@ -109,12 +88,10 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
 
     public function testPendingResult()
     {
-        $promise = (new Promise())
+        $promise = (new FulfilledPromise(4))
             ->then(function ($value) {
             return $value + 2;
         });
-
-        $promise->resolve(4);
 
         $this->assertEquals(6, $promise->await());
     }
@@ -126,12 +103,10 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
     public function testPendingFail()
     {
         $finalValue = 0;
-        $promise = (new Promise())
+        $promise = (new RejectedPromise(new Exception('4')))
             ->otherwise(function ($value) use (&$finalValue) {
                 $finalValue = $value->getMessage() + 2;
             });
-
-        $promise->reject(new Exception('4'));
 
         $this->assertEquals(6, $finalValue);
         $promise->await();
@@ -159,7 +134,7 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
         }))->then(function ($result) {
             return 'incorrect';
         })->otherwise(function ($reason) {
-            return $reason->getMessage();
+            return $reason;
         });
 
         $this->assertTrue($promise->isRejected());
@@ -167,31 +142,23 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
     }
 
     /**
-     * @expectedException \LogicException
-     */
-    public function testFulfillTwice()
-    {
-        $promise = new Promise();
-        $promise->resolve(1);
-        $promise->resolve(1);
-    }
-
-    /**
-     * @expectedException \LogicException
+     * @expectedException \Exception
+     * @expectedExceptionMessage 2
      */
     public function testRejectTwice()
     {
-        $promise = new Promise();
-        $promise->reject(new Exception('1'));
-        $promise->reject(new Exception('1'));
+        $promise = (new RejectedPromise(new Exception('1')))
+            ->otherwise(function () {
+                throw new Exception('2');
+            })->await();
     }
 
     public function testFromFailureHandler()
     {
         $ok = 0;
-        $promise = new Promise();
+        $promise = new RejectedPromise(new Exception('foo'));
         $promise->otherwise(function ($reason) {
-            $this->assertEquals('foo', $reason);
+            $this->assertEquals('foo', $reason->getMessage());
             throw new \Exception('hi');
         })->then(function () use (&$ok) {
             $ok = -1;
@@ -199,20 +166,14 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
             $ok = 1;
         });
 
-        $this->assertEquals(0, $ok);
-        $promise->reject(new Exception('foo'));
-
         $this->assertEquals(1, $ok);
     }
 
     public function testWaitResolve()
     {
-        $promise = new Promise(null, function () use (&$promise) {
-            $promise->resolve(1);
-        });
         $this->assertEquals(
             1,
-            $promise->await()
+            (new FulfilledPromise(1))->await()
         );
     }
 
@@ -227,8 +188,8 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
 
     public function testWaitRejectedException()
     {
-        $promise = new Promise(null, function () use (&$promise) {
-            $promise->reject(new \OutOfBoundsException('foo'));
+        $promise = new Promise(function () {
+            throw new \OutOfBoundsException('foo');
         });
         try {
             $promise->await();
@@ -239,17 +200,25 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
         }
     }
 
+    /**
+     * @expectedException \Exception
+     * @expectedExceptionMessage foo
+     */
     public function testWaitRejectedScalar()
     {
-        $promise = new Promise(null, function () use (&$promise) {
-            $promise->reject(new Exception('foo'));
+        $promise = (new Promise(function () {
+            throw new Exception('foo');
+        }))->await();
+    }
+
+    public function testCancelPending()
+    {
+        $promise = new Promise();
+        $promise->cancel();
+
+        $promise->then(function () {
+            throw new \RuntimeException('Should not throw');
         });
-        try {
-            $promise->await();
-            $this->fail('We did not get the expected exception');
-        } catch (\Exception $e) {
-            $this->assertInstanceOf('Exception', $e);
-            $this->assertEquals('foo', $e->getMessage());
-        }
+        $this->assertTrue($promise->isCanceled());
     }
 }
