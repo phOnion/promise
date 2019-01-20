@@ -103,10 +103,6 @@ class Promise implements
 
     private function settle(string $state, \SplQueue $queue, $result)
     {
-        if ($this->isCanceled()) {
-            return;
-        }
-
         if ($this->getState() !== $state && !$this->isPending()) {
             throw new \LogicException("Promise already {$this->getState()}");
         }
