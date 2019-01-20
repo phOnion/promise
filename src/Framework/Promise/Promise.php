@@ -53,7 +53,7 @@ class Promise implements
             try {
                 $task(function ($value) {
                     $this->resolve($value);
-                }, function ($value) {
+                }, function (\Throwable $value) {
                     $this->reject($value);
                 });
             } catch (\Throwable $ex) {
@@ -66,12 +66,12 @@ class Promise implements
         }
     }
 
-    public function resolve($value): void
+    private function resolve($value): void
     {
         $this->settle(self::FULFILLED, $this->fulfilledQueue, $value);
     }
 
-    public function reject(\Throwable $ex): void
+    private function reject(\Throwable $ex): void
     {
        $this->settle(self::REJECTED, $this->rejectedQueue, $ex);
     }
@@ -107,9 +107,10 @@ class Promise implements
             return;
         }
 
-        if (!$this->isPending()) {
+        if ($this->getState() !== $state && !$this->isPending()) {
             throw new \LogicException("Promise already {$this->getState()}");
         }
+
         $this->value = $result;
         $this->state = $state;
 
@@ -143,7 +144,7 @@ class Promise implements
     {
         if (is_thenable($result)) {
             $this->state = self::PENDING;
-            if ($result instanceof self) {
+            if ($result instanceof PromiseInterface) {
                 $this->state = $result->getState();
             }
 
@@ -178,20 +179,18 @@ class Promise implements
     public function then(?Closure $onFulfilled = null, ?Closure $onRejected = null): ThenableInterface
     {
         try {
-            if ($this->isFulfilled()) {
-                $this->value = $onFulfilled($this->value) ?? $this->value;
-                $this->handleResult($this->value);
+            if ($onFulfilled) {
+                $this->fulfilledQueue->enqueue($onFulfilled);
+            }
 
-                return $this;
+            if ($this->isFulfilled()) {
+                $this->settle(self::FULFILLED, $this->fulfilledQueue, $this->value);
             }
 
             if ($onRejected !== null) {
                 $this->otherwise($onRejected);
             }
 
-            if ($onFulfilled) {
-                $this->fulfilledQueue->enqueue($onFulfilled);
-            }
         } catch (\Throwable $ex) {
             if ($this->isPending()) {
                 $this->reject($ex);
@@ -204,13 +203,10 @@ class Promise implements
     public function otherwise(Closure $onRejected): PromiseInterface
     {
 
-        if ($this->getState() === self::REJECTED) {
-            $onRejected($this->value) ?? $this->value;
-            $this->handleResult($this->value);
-            return $this;
-        }
-
         $this->rejectedQueue->enqueue($onRejected);
+        if ($this->getState() === self::REJECTED) {
+            $this->settle(self::REJECTED, $this->rejectedQueue, $this->value);
+        }
 
         return $this;
     }
