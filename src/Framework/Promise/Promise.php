@@ -35,7 +35,7 @@ class Promise implements
     /** @var \Closure $waitFn */
     private $waitFn;
 
-    public function __construct(Closure $task = null, Closure $wait = null, Closure $cancel = null)
+    public function __construct(Closure $task = null, ?Closure $wait = null, ?Closure $cancel = null)
     {
         $this->fulfilledQueue = new \SplQueue();
         $this->fulfilledQueue->setIteratorMode(\SplQueue::IT_MODE_DELETE);
@@ -45,6 +45,9 @@ class Promise implements
 
         $this->finallyQueue = new \SplQueue();
         $this->finallyQueue->setIteratorMode(\SplQueue::IT_MODE_DELETE);
+
+        $this->waitFn = $wait ?? function () {};
+        $this->cancelFn = $cancel ?? function () {};
 
         if ($task !== null) {
             try {
@@ -61,9 +64,6 @@ class Promise implements
                 $this->reject($ex);
             }
         }
-
-        $this->waitFn = $wait;
-        $this->cancelFn = $cancel;
     }
 
     public function resolve($value): void
@@ -80,15 +80,13 @@ class Promise implements
     {
         if ($this->isPending()) {
             $this->state = self::CANCELLED;
-            if ($this->cancelFn instanceof Closure) {
-                ($this->cancelFn)();
-            }
+            ($this->cancelFn)();
         }
     }
 
     public function await()
     {
-        if ($this->isPending() && $this->waitFn instanceof Closure) {
+        if ($this->isPending()) {
             ($this->waitFn)();
         }
 
@@ -105,6 +103,10 @@ class Promise implements
 
     private function settle(string $state, \SplQueue $queue, $result)
     {
+        if ($this->isCanceled()) {
+            return;
+        }
+
         if (!$this->isPending()) {
             throw new \LogicException("Promise already {$this->getState()}");
         }
