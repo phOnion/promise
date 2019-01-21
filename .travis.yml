@@ -9,6 +9,7 @@ php:
 install: composer install -o --no-interaction --prefer-dist
 script:
 - vendor/bin/phpunit --bootstrap vendor/autoload.php
+- vendor/bin/infection
 - vendor/bin/phpcs src/ --standard=psr2
 - vendor/bin/psalm --show-info=false
 env:
