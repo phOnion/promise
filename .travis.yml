@@ -1,0 +1,16 @@
+language: php
+before_script:
+- echo 'zend.assertions=1' >> ~/.phpenv/versions/$(phpenv version-name)/etc/conf.d/travis.ini
+- echo 'assert.exception=1' >> ~/.phpenv/versions/$(phpenv version-name)/etc/conf.d/travis.ini
+php:
+- '7.1'
+- '7.2'
+- '7.3'
+install: composer install -o --no-interaction --prefer-dist
+script:
+- vendor/bin/phpunit --bootstrap vendor/autoload.php
+- vendor/bin/phpcs src/ --standard=psr2
+- vendor/bin/psalm --show-info=false
+env:
+  global:
+    secure: wPkwVMObWXTFBYQp5Gx0n3soZPs+gWSn6UxSfgYJaIAZfCfcf3zub2WfY4eyqbTb3YLA+sevMyQM1yzZRmbj0775fyiOKYiHtTrB1m6halgsCwtyjclpOroxwGTcTb95F5ovfaz35Cd8/11xaMs4CYFI2304BooEdLN7UQ7hMfuTPEc0AU6+MKcse83x/NpnFkwFWkMbf0a6yZmysGFpRhqwtvRPt/C3W0NguohTKrrMi71TkRSvYvizslBpTVAgk2n1a0UCHAxLCCkiFld+OQ7diesmA4QzTsPQw6oh4TVWFWU7IZS7vbq+HqBmbsT6dk+K7eQMI+g3QG/EEFvKxs4sBfiXjzuA5KXUQzFy5fs6oubehFGcbhfoi6Vw7bJmvAVnAhyjnQAG6mG1ICX5GlLcJBkd+OZj2VZXuKidB+QLJ5TXQeaCQDcNknYHo0BSBhg2YW8bSut7p03ukKx9GBVOXz8lzXZkluhs4J1UCChRYOCXsyKSdoZv8Ii+Hnvxg5Lz43WkVeBxE1Tq34wLjvDCoFt1lGpjMC4Ym+bD87xVgdUNuae6GZRzwliOF0CkDweO9JFfA+VbkMHB+WdlZbV3dZCkX6ox3Wq5EHCRFueOV1xvaaBirs+ySjFP5DXTX+gw3fAHOzXbaMGNnie2GBVTbLdzOvbOvX/rULtVoBw=
