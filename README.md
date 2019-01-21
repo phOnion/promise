@@ -1,5 +1,11 @@
 # Introduction
 
+
+[![Build Status](https://travis-ci.org/phOnion/promise.svg?branch=master)](https://travis-ci.org/phOnion/promise)
+[![Mutation testing badge](https://badge.stryker-mutator.io/github.com/phOnion/promise/master)](https://infection.github.io)
+
+---------------
+
 This is an [Promises/A+](https://promisesaplus.com/) implementation that should be fully compatible with any already existing implementations without any 3rd party dependencies.
 
 This package defines 2 interfaces `PromiseInterface` & `ThenableInterface` as per the spec also there are some helper functions as well as some that provide a more
