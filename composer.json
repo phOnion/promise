@@ -1,5 +1,6 @@
 {
     "name": "onion/promise",
+    "license": "MIT",
     "autoload": {
         "psr-4": {
             "Onion\\": "src/"
