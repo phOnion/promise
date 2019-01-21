@@ -103,6 +103,10 @@ class Promise implements
 
     private function settle(string $state, \SplQueue $queue, $result)
     {
+        if ($this->getState() === self::FULFILLED && $state === self::REJECTED) {
+            $this->state = self::PENDING;
+        }
+
         if ($this->getState() !== $state && !$this->isPending()) {
             throw new \LogicException("Promise already {$this->getState()}");
         }
@@ -111,54 +115,56 @@ class Promise implements
         $this->state = $state;
 
         try {
-            while (!$queue->isEmpty() && ($callback = $queue->dequeue())) {
-                $this->value = $callback($this->value) ?? $this->value;
-
-                if ($this->value === $this) {
-                    throw new \InvalidArgumentException('Unable to process promise with itself');
-                }
-
-                if ($this->handleResult($this->value)) {
-                    break;
-                }
-            }
-        } catch (\Throwable $ex) {
-            $this->state = self::PENDING;
-            $this->reject($ex);
-        } finally {
-            if (!$this->isPending()) {
+            if ($queue->isEmpty()) {
                 $finally = $this->finallyQueue;
 
                 while (!$finally->isEmpty() && ($callback = $finally->dequeue())) {
                     $callback();
                 }
+                return;
             }
+            $callback = $queue->dequeue();
+            $this->value = $callback($this->value) ?? $this->value;
+
+            if ($this->handleResult($this->value)) {
+                return;
+            }
+
+            if ($this->value instanceof \Throwable) {
+                return $this->reject($this->value);
+            }
+
+            $this->state = self::FULFILLED;
+            $this->resolve($this->value);
+        } catch (\Throwable $ex) {
+            $this->state = self::PENDING;
+            $this->reject($ex);
         }
     }
 
     private function handleResult(&$result)
     {
+        if ($result === $this) {
+            throw new \InvalidArgumentException('Unable to process promise with itself');
+        }
+
         if (is_thenable($result)) {
             $this->state = self::PENDING;
             if ($result instanceof PromiseInterface) {
                 $this->state = $result->getState();
             }
 
-            try {
-                $result->then(function ($value) {
-                    $this->resolve($value);
-                }, function ($reason) {
-                    $this->reject($reason);
-                });
-            } catch (\Exception $ex) {
-                $this->reject($ex);
-            }
+            $result->then(function ($value) {
+                $this->resolve($value);
+            }, function ($reason) {
+                $this->reject($reason);
+            });
 
             return true;
         }
 
         if ($result instanceof \Closure) {
-            $result = $result(function ($value) {
+            $result(function ($value) {
                 if (!$this->isPending()) {
                     $this->resolve($value);
                 }
@@ -174,23 +180,16 @@ class Promise implements
 
     public function then(?Closure $onFulfilled = null, ?Closure $onRejected = null): ThenableInterface
     {
-        try {
-            if ($onFulfilled) {
-                $this->fulfilledQueue->enqueue($onFulfilled);
-            }
+        if ($onFulfilled) {
+            $this->fulfilledQueue->enqueue($onFulfilled);
+        }
 
-            if ($this->isFulfilled()) {
-                $this->settle(self::FULFILLED, $this->fulfilledQueue, $this->value);
-            }
+        if ($this->isFulfilled()) {
+            $this->settle(self::FULFILLED, $this->fulfilledQueue, $this->value);
+        }
 
-            if ($onRejected !== null) {
-                $this->otherwise($onRejected);
-            }
-
-        } catch (\Throwable $ex) {
-            if ($this->isPending()) {
-                $this->reject($ex);
-            }
+        if ($onRejected !== null) {
+            $this->otherwise($onRejected);
         }
 
         return $this;
@@ -209,15 +208,12 @@ class Promise implements
 
     public function finally(Closure ...$callback): PromiseInterface
     {
-        if (!$this->isPending()) {
-            foreach ($callback as $cb) {
+        foreach ($callback as $cb) {
+            if ($this->isFulfilled() || $this->isRejected()) {
                 $cb();
+                continue;
             }
 
-            return $this;
-        }
-
-        foreach ($callback as $cb) {
             $this->finallyQueue->enqueue($cb);
         }
 
