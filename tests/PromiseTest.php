@@ -50,6 +50,32 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals(6, $promise->await());
     }
 
+    public function testRejectedChainPromise()
+    {
+        $promise = (new FulfilledPromise(1))->then(function ($value) {
+            return new RejectedPromise(new \RuntimeException('2'));
+        })->otherwise(function ($reason) {
+            return ($reason->getMessage() + 4);
+        });
+
+        $this->assertEquals(6, $promise->await());
+    }
+
+    /**
+     * @expectedException \Exception
+     * @expectedExceptionMessage 3
+     */
+    public function testRejectedChainPromiseWithThrow()
+    {
+        $promise = (new FulfilledPromise(1))->then(function ($value) {
+            return new RejectedPromise(new \RuntimeException('2'));
+        })->otherwise(function ($reason) {
+            throw new \Exception('3');
+        });
+
+        $this->assertEquals(6, $promise->await());
+    }
+
     public function testChainCallback()
     {
         $finalValue = 0;
@@ -147,10 +173,12 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
      */
     public function testRejectTwice()
     {
-        $promise = (new RejectedPromise(new Exception('1')))
-            ->otherwise(function () {
-                throw new Exception('2');
-            })->await();
+        $promise = (new Promise(function ($resolve, $reject) {
+            $reject(new Exception('1'));
+            $reject(new Exception('2'));
+        }))->otherwise(function () {
+            throw new Exception('2');
+        })->await();
     }
 
     public function testFromFailureHandler()
@@ -175,6 +203,32 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
             1,
             (new FulfilledPromise(1))->await()
         );
+    }
+
+    /**
+     * @expectedException \LogicException
+     * @expectedExceptionMessage Promise already rejected
+     */
+    public function testFulfillRejected()
+    {
+        $promise = (new Promise(function ($resolve, $reject) {
+            $reject(new Exception('1'));
+            $resolve(true);
+        }))->otherwise(function ($reason) {
+            return $reason;
+        })->await();
+    }
+
+    /**
+     * @expectedException \InvalidArgumentException
+     * @expectedExceptionMessage Unable to process promise with itself
+     */
+    public function testSelfResolution()
+    {
+        $promise = new FulfilledPromise(true);
+        $promise->then(function ($reason) use (&$promise) {
+            return $promise;
+        })->await();
     }
 
     /**
@@ -211,6 +265,17 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
         }))->await();
     }
 
+    public function testFinallyCalls()
+    {
+        $promise = (new FulfilledPromise(1))
+            ->finally(function () {
+                $this->assertTrue(true);
+            })
+            ->then(function () {
+                $this->assertFalse(false);
+            });
+    }
+
     public function testCancelPending()
     {
         $promise = new Promise();
@@ -220,5 +285,133 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
             throw new \RuntimeException('Should not throw');
         });
         $this->assertTrue($promise->isCanceled());
+    }
+
+    public function testFulfilledWithClosure()
+    {
+        $this->assertSame(3, (new FulfilledPromise(1))->then(function () {
+            return function($resolve, $reject) {
+                $resolve(3);
+            };
+        })->await());
+    }
+
+    /**
+     * @expectedException \Exception
+     * @expectedExceptionMessage 1
+     */
+    public function testRejectFulfilledFromClosure()
+    {
+        $this->assertSame(3, (new FulfilledPromise(1))->then(function () {
+            return function($resolve, $reject) {
+                $reject(new \Exception('1'));
+            };
+        })->await());
+    }
+
+    /**
+     * @expectedException \Exception
+     * @expectedExceptionMessage 2
+     */
+    public function testRejectFulfilledFromThen()
+    {
+        $this->assertSame(3, (new FulfilledPromise(1))->then(function () {
+            return function($resolve, $reject) {
+                $reject(new \Exception('1'));
+            };
+        }, function () {
+            throw new \Exception('2');
+        })->await());
+    }
+
+    public function testResolveHandledRejectionPromise()
+    {
+        $this->assertTrue((new RejectedPromise(new \Exception('1')))
+            ->then(null, function () {
+                return true;
+            })->await());
+    }
+
+    public function testStaticRace()
+    {
+        for ($i=0; $i<5; $i++) {
+            $stack = [
+                new Promise(),
+                new Promise(),
+                new Promise(),
+                new Promise(),
+                new Promise(),
+                new FulfilledPromise($i)
+            ];
+
+            shuffle($stack);
+
+            $this->assertSame($i, Promise::race($stack)->await());
+        }
+    }
+
+    public function testRejectionStaticRace()
+    {
+        for ($i=0; $i<5; $i++) {
+            $stack = [
+                new Promise(),
+                new Promise(),
+                new Promise(),
+                new Promise(),
+                new Promise(),
+                new RejectedPromise(new \Exception("{$i}"))
+            ];
+
+            shuffle($stack);
+
+            try {
+                Promise::race($stack)->await();
+            } catch (\Exception $ex) {
+                $this->assertSame("{$i}", $ex->getMessage());
+            }
+        }
+    }
+
+    public function testStaticAll()
+    {
+        for ($i=0; $i<5; $i++) {
+            $stack = [
+                new FulfilledPromise(mt_rand(0, 10)),
+                new FulfilledPromise(mt_rand(0, 10)),
+                new FulfilledPromise(mt_rand(0, 10)),
+                new FulfilledPromise(mt_rand(0, 10)),
+                new FulfilledPromise(mt_rand(0, 10)),
+                new FulfilledPromise(mt_rand(0, 10))
+            ];
+
+            $expected = [];
+            foreach ($stack as $index => $item) {
+                $expected[$index] = $item->await();
+            }
+
+            $this->assertSame($expected, Promise::all($stack)->await());
+        }
+    }
+
+    public function testRejectedStaticAll()
+    {
+        for ($i=0; $i<5; $i++) {
+            $stack = [
+                new FulfilledPromise(1),
+                new FulfilledPromise(1),
+                new FulfilledPromise(1),
+                new FulfilledPromise(1),
+                new FulfilledPromise(1),
+                new RejectedPromise(new \Exception("{$i}"))
+            ];
+
+            shuffle($stack);
+
+            try {
+                Promise::all($stack)->await();
+            } catch (\Exception $ex) {
+                $this->assertSame("{$i}", $ex->getMessage());
+            }
+        }
     }
 }
