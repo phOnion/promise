@@ -22,7 +22,7 @@ if (!$coroutineExists) {
     }
 
     if (!function_exists('go')) {
-        function go() {
+        function go($callback) {
             // here to silence psalm
         }
     }
