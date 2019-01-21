@@ -17,6 +17,15 @@ if (!function_exists(__NAMESPACE__ . '\is_thenable')) {
 $coroutineExists = function_exists(__NAMESPACE__ . '\coroutine');
 
 if (!$coroutineExists) {
+    if (!defined('SWOOLE_HOOK_ALL')) {
+        define('SWOOLE_HOOK_ALL', 0);
+    }
+
+    if (!function_exists('go')) {
+        function go() {
+            // here to silence psalm
+        }
+    }
     if (extension_loaded('swoole') && function_exists('go')) {
         if (method_exists('\Swoole\Runtime', 'enableCoroutine')) {
             \Swoole\Runtime::enableCoroutine(true, SWOOLE_HOOK_ALL);
