@@ -35,19 +35,14 @@ class Promise implements
     /** @var \Closure $waitFn */
     private $waitFn;
 
-    public function __construct(Closure $task = null, ?Closure $wait = null, ?Closure $cancel = null)
+    public function __construct(?Closure $task = null, ?Closure $wait = null, ?Closure $cancel = null)
     {
         $this->fulfilledQueue = new \SplQueue();
-        $this->fulfilledQueue->setIteratorMode(\SplQueue::IT_MODE_DELETE);
-
         $this->rejectedQueue = new \SplQueue();
-        $this->rejectedQueue->setIteratorMode(\SplQueue::IT_MODE_DELETE);
-
         $this->finallyQueue = new \SplQueue();
-        $this->finallyQueue->setIteratorMode(\SplQueue::IT_MODE_DELETE);
 
-        $this->waitFn = $wait ?? function () {};
-        $this->cancelFn = $cancel ?? function () {};
+        $this->waitFn = $wait;
+        $this->cancelFn = $cancel;
 
         if ($task !== null) {
             try {
@@ -80,33 +75,19 @@ class Promise implements
     {
         if ($this->isPending()) {
             $this->state = self::CANCELLED;
-            ($this->cancelFn)();
+            if ($this->cancelFn instanceof Closure) {
+                ($this->cancelFn)();
+            }
         }
     }
 
-    public function await()
+    private function getState(): string
     {
-        if ($this->isPending()) {
-            ($this->waitFn)();
-        }
-
-        if ($this->isFulfilled()) {
-            return $this->value;
-        }
-
-        if ($this->isRejected()) {
-            throw $this->value;
-        }
-
-        throw new \LogicException("Waiting on {$this->getState()} promise failed");
+        return $this->state;
     }
 
     private function settle(string $state, \SplQueue $queue, $result)
     {
-        if ($this->getState() === self::FULFILLED && $state === self::REJECTED) {
-            $this->state = self::PENDING;
-        }
-
         if ($this->getState() !== $state && !$this->isPending()) {
             throw new \LogicException("Promise already {$this->getState()}");
         }
@@ -127,14 +108,16 @@ class Promise implements
             $this->value = $callback($this->value) ?? $this->value;
 
             if ($this->handleResult($this->value)) {
-                return;
+                if ($this->isPending()) {
+                    return;
+                }
             }
 
             if ($this->value instanceof \Throwable) {
                 return $this->reject($this->value);
             }
 
-            $this->state = self::FULFILLED;
+            $this->state = self::PENDING;
             $this->resolve($this->value);
         } catch (\Throwable $ex) {
             $this->state = self::PENDING;
@@ -159,23 +142,37 @@ class Promise implements
             }, function ($reason) {
                 $this->reject($reason);
             });
-
-            return true;
         }
 
         if ($result instanceof \Closure) {
+            $this->state = self::PENDING;
             $result(function ($value) {
-                if (!$this->isPending()) {
+                if ($this->isPending()) {
                     $this->resolve($value);
                 }
             }, function ($value) {
-                if (!$this->isPending()) {
+                if ($this->isPending()) {
                     $this->reject($value);
                 }
             });
         }
+    }
 
-        return false;
+    public function await()
+    {
+        if ($this->isPending() && $this->waitFn instanceof Closure) {
+            ($this->waitFn)();
+        }
+
+        if ($this->isFulfilled()) {
+            return $this->value;
+        }
+
+        if ($this->isRejected()) {
+            throw $this->value;
+        }
+
+        throw new \LogicException("Waiting on {$this->getState()} promise failed");
     }
 
     public function then(?Closure $onFulfilled = null, ?Closure $onRejected = null): ThenableInterface
@@ -218,11 +215,6 @@ class Promise implements
         }
 
         return $this;
-    }
-
-    private function getState(): string
-    {
-        return $this->state;
     }
 
     public function isPending(): bool

@@ -209,14 +209,24 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
      * @expectedException \LogicException
      * @expectedExceptionMessage Promise already rejected
      */
+    public function testFulfillRejectedException()
+    {
+        $result = (new Promise(function ($resolve, $reject) {
+            $reject(new Exception('1'));
+            $resolve(true);
+        }))->await();
+    }
+
     public function testFulfillRejected()
     {
-        $promise = (new Promise(function ($resolve, $reject) {
+        $result = (new Promise(function ($resolve, $reject) {
             $reject(new Exception('1'));
             $resolve(true);
         }))->otherwise(function ($reason) {
-            return $reason;
+            return true;
         })->await();
+
+        $this->assertTrue($result);
     }
 
     /**
@@ -267,23 +277,51 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
 
     public function testFinallyCalls()
     {
+        $t = false;
         $promise = (new FulfilledPromise(1))
-            ->finally(function () {
-                $this->assertTrue(true);
-            })
-            ->then(function () {
-                $this->assertFalse(false);
+            ->finally(function() {}, function () use (&$t) {
+                $t = true;
             });
+
+        $this->assertTrue($t);
     }
 
     public function testCancelPending()
     {
-        $promise = new Promise();
+        $t = false;
+        $promise = new Promise(null, null, function () use (&$t) {
+            $t = true;
+        });
         $promise->cancel();
 
         $promise->then(function () {
             throw new \RuntimeException('Should not throw');
         });
+        $this->assertTrue($promise->isCanceled());
+        $this->assertTrue($t);
+    }
+
+    public function testCancelNotPending()
+    {
+        $promise = new FulfilledPromise(1);
+        $promise->cancel();
+
+        $promise->then(function () {
+            throw new \RuntimeException('Should not throw');
+        });
+        $this->assertFalse($promise->isCanceled());
+    }
+
+    /**
+     * @expectedException \Exception
+     * @expectedExceptionMessage 1
+     */
+    public function testCancelException()
+    {
+        $promise = new Promise(function () {}, null, function () {
+            throw new \Exception('1');
+        });
+        $promise->cancel();
         $this->assertTrue($promise->isCanceled());
     }
 
@@ -339,12 +377,10 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
                 new Promise(),
                 new Promise(),
                 new Promise(),
-                new Promise(),
-                new Promise(),
-                new FulfilledPromise($i)
+                new FulfilledPromise($i),
+                new FulfilledPromise($i+2),
+                new FulfilledPromise($i+1)
             ];
-
-            shuffle($stack);
 
             $this->assertSame($i, Promise::race($stack)->await());
         }
@@ -376,18 +412,20 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
     {
         for ($i=0; $i<5; $i++) {
             $stack = [
-                new FulfilledPromise(mt_rand(0, 10)),
-                new FulfilledPromise(mt_rand(0, 10)),
-                new FulfilledPromise(mt_rand(0, 10)),
-                new FulfilledPromise(mt_rand(0, 10)),
-                new FulfilledPromise(mt_rand(0, 10)),
-                new FulfilledPromise(mt_rand(0, 10))
+                mt_rand(0, 100) => new FulfilledPromise(mt_rand(0, 10)),
+                mt_rand(0, 100) => new FulfilledPromise(mt_rand(0, 10)),
+                mt_rand(0, 100) => new FulfilledPromise(mt_rand(0, 10)),
+                mt_rand(0, 100) => new FulfilledPromise(mt_rand(0, 10)),
+                mt_rand(0, 100) => new FulfilledPromise(mt_rand(0, 10)),
+                mt_rand(0, 100) => new FulfilledPromise(mt_rand(0, 10))
             ];
 
             $expected = [];
             foreach ($stack as $index => $item) {
                 $expected[$index] = $item->await();
             }
+
+            ksort($expected);
 
             $this->assertSame($expected, Promise::all($stack)->await());
         }
