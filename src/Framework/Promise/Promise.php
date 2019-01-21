@@ -29,10 +29,10 @@ class Promise implements
     /** @var \SplQueue $finallyQueue */
     private $finallyQueue;
 
-    /** @var \Closure $cancelFn */
+    /** @var \Closure|null $cancelFn */
     private $cancelFn;
 
-    /** @var \Closure $waitFn */
+    /** @var \Closure|null $waitFn */
     private $waitFn;
 
     public function __construct(?Closure $task = null, ?Closure $wait = null, ?Closure $cancel = null)
@@ -46,9 +46,9 @@ class Promise implements
 
         if ($task !== null) {
             try {
-                $task(function ($value) {
+                $task(function ($value): void {
                     $this->resolve($value);
-                }, function (\Throwable $value) {
+                }, function (\Throwable $value): void {
                     $this->reject($value);
                 });
             } catch (\Throwable $ex) {
@@ -134,7 +134,19 @@ class Promise implements
         if (is_thenable($result)) {
             $this->state = self::PENDING;
             if ($result instanceof PromiseInterface) {
-                $this->state = $result->getState();
+                if ($result->isFulfilled()) {
+                    $this->state = self::FULFILLED;
+                }
+
+                if ($result->isRejected()) {
+                    $this->state = self::REJECTED;
+                }
+
+                if ($result instanceof CancelableInterface) {
+                    if ($result->isCanceled()) {
+                        $this->state = self::CANCELLED;
+                    }
+                }
             }
 
             $result->then(function ($value) {
@@ -242,11 +254,14 @@ class Promise implements
      * the whole promise is rejected with it's reason
      *
      * @var ThenableInterface[] $promises
-     *
-     * @return PromiseInterface
      */
     public static function all(iterable $promises): PromiseInterface
     {
+        if ($promises instanceof \Iterator) {
+            $promises = iterator_to_array($promises);
+        }
+
+        /** @var array $promises */
         $result = new self(function ($resolve, $reject) use ($promises) {
             $results = [];
             $count = count($promises);
@@ -269,11 +284,13 @@ class Promise implements
         });
 
 
-        return $result->then(function ($results) {
+        $result->then(function ($results): array {
             ksort($results);
 
             return $results;
         });
+
+        return $result;
     }
 
     /**
