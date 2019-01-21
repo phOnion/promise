@@ -9,7 +9,11 @@
             "src/functions.php"
         ]
     },
+    "autoload-dev": {
+        "Promise\\Tests\\": "tests/"
+    },
     "require-dev": {
-        "phpunit/phpunit": "^7.5"
+        "phpunit/phpunit": "^7.5",
+        "infection/infection": "^0.11.5"
     }
 }
