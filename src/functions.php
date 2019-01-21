@@ -2,8 +2,8 @@
 namespace Onion\Framework\Promise;
 
 use Closure;
-use Interfaces\ThenableInterface;
 use Onion\Framework\Promise\Interfaces\PromiseInterface;
+use Onion\Framework\Promise\Interfaces\ThenableInterface;
 
 if (!function_exists(__NAMESPACE__ . '\is_thenable')) {
     function is_thenable($value): bool
