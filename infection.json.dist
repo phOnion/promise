@@ -9,7 +9,7 @@
         "configDir": "."
     },
     "logs": {
-        "text": "build/infection"
+        "text": "infection.build.log"
     },
     "mutators": {
         "@default": true
