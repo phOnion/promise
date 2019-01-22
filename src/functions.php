@@ -101,11 +101,12 @@ if (!$coroutineExists) {
                         $reject($ex);
                     }
                 });
+            }, function () {
+                queue()->run();
             });
         }
 
         register_tick_function([queue(), 'tick'], 1);
-        register_shutdown_function([queue(), 'run']);
     }
 }
 
