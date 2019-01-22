@@ -2,7 +2,7 @@
 
 
 [![Build Status](https://travis-ci.org/phOnion/promise.svg?branch=master)](https://travis-ci.org/phOnion/promise)
-[![Mutation testing badge](https://badge.stryker-mutator.io/github.com/phOnion/promise/master)](https://infection.github.io)
+<!-- [![Mutation testing badge](https://badge.stryker-mutator.io/github.com/phOnion/promise/master)](https://infection.github.io) -->
 
 ---------------
 
