@@ -105,8 +105,6 @@ if (!$coroutineExists) {
                 queue()->run();
             });
         }
-
-        register_tick_function([queue(), 'tick'], 1);
     }
 }
 
