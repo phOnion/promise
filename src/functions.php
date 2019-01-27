@@ -14,26 +14,22 @@ if (!function_exists(__NAMESPACE__ . '\is_thenable')) {
     }
 }
 
-$coroutineExists = function_exists(__NAMESPACE__ . '\coroutine');
-
-if (!$coroutineExists) {
+if (!function_exists(__NAMESPACE__ . '\coroutine')) {
     if (!defined('SWOOLE_HOOK_ALL')) {
         define('SWOOLE_HOOK_ALL', 0);
     }
 
     if (!function_exists('go')) {
-        function go($callback) {
+        function go($callback)
+        {
             // here to silence psalm
         }
     }
     if (extension_loaded('swoole') && function_exists('go')) {
-        if (method_exists('\Swoole\Runtime', 'enableCoroutine')) {
-            \Swoole\Runtime::enableCoroutine(true, SWOOLE_HOOK_ALL);
-        }
-
-        function coroutine(Closure $task): PromiseInterface {
+        function coroutine(Closure $task): PromiseInterface
+        {
             return new Promise(function ($resolve, $reject) use ($task) {
-                go(function() use ($task, $resolve, $reject) {
+                go(function () use ($task, $resolve, $reject) {
                     try {
                         $resolve($task());
                     } catch (\Throwable $ex) {
@@ -41,10 +37,10 @@ if (!$coroutineExists) {
                     }
                 });
             });
-        };
-
+        }
     } else {
-        function &queue() {
+        function &queue()
+        {
             static $queue = null;
 
             if ($queue === null) {
@@ -109,7 +105,8 @@ if (!$coroutineExists) {
 }
 
 if (!function_exists(__NAMESPACE__ . '\async')) {
-    function async(Closure $callback) {
+    function async(Closure $callback)
+    {
         return coroutine($callback);
     }
 }
