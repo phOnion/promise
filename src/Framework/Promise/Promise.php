@@ -68,7 +68,7 @@ class Promise implements
 
     private function reject(\Throwable $ex): void
     {
-       $this->settle(self::REJECTED, $this->rejectedQueue, $ex);
+        $this->settle(self::REJECTED, $this->rejectedQueue, $ex);
     }
 
     public function cancel(): void
