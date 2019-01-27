@@ -9,7 +9,10 @@
         "configDir": "."
     },
     "logs": {
-        "text": "infection.build.log"
+        "text": "infection.build.log",
+        "badge": {
+            "branch": "master"
+        }
     },
     "mutators": {
         "@default": true

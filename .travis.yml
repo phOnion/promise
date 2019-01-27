@@ -12,3 +12,6 @@ script:
 - vendor/bin/infection -j4 -q --min-msi=85 --min-covered-msi=95
 - vendor/bin/psalm --show-info=false
 - vendor/bin/phpcs src/ --standard=psr2
+env:
+  global:
+    secure: d+/E6Z9wXB/EpjtSoz2Eld1s3se4j+99K72eT2LlPhdEU1WJoK+CtwyUo+21aA26p1SECfqTHghvtb51ZlMYmjTanRcAJFkGzdCWM69D26C34chz2w/1Ie3OFkSo0uJMSbItK0ecDbTXBZXZmUYW/03pOk/BQUz9iKS/BLrJfW/Hn93U/O+/u6nmOhK5VKLRtBIDJylplkE4HSSdRuoEouIizBhAPBXc9q9uCLPXKlqOk1Jp4wyoCRIWK7i380/2bOyyacI3/7V6rc/BRWmh/4pM8TZTf4hH+Du9hp31ivLtM32oP+fgupm/LCXEKUV37fODmRM8HLv6wnfk6sWMKN0dyjnbV/TMrj4+rMIh4UpzweD45iaEJbN04OhoFv4oTCz2gwGc9vrtnWf4qC1eZlB+DPiaJVPosLFmowkXc1DShiPV7b9XDPR7WAHj0PkYt0TzVTJJNfqoJEQM4xrVDm9l6WP05Wd3ezhzJTcnkmYuvOrHRlcAgnrKZmlZ4L7sHhWBUpMHGV/unurKDZsVjnX9v16J8CwdtD0sncmjTdWtfFR2X+UQd749B7YBymv8lHGcxl3qjo5bn3pJzTeSBiYac0n333UsHs/ZaYlV6FaHsZXtGEfZv0CA+LijdFSB+m4BoZ+zVcrzmRbtL/jpR9MDBHc4HHBq/jTrINaagCM=
