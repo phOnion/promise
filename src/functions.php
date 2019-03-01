@@ -2,7 +2,7 @@
 namespace Onion\Framework\Promise;
 
 use Closure;
-use Onion\Framework\Promise\Interfaces\PromiseInterface;
+use function Onion\Framework\EventLoop\coroutine;
 use Onion\Framework\Promise\Interfaces\ThenableInterface;
 
 if (!function_exists(__NAMESPACE__ . '\is_thenable')) {
@@ -14,99 +14,18 @@ if (!function_exists(__NAMESPACE__ . '\is_thenable')) {
     }
 }
 
-if (!function_exists(__NAMESPACE__ . '\coroutine')) {
-    if (!defined('SWOOLE_HOOK_ALL')) {
-        define('SWOOLE_HOOK_ALL', 0);
-    }
-
-    if (!function_exists('go')) {
-        function go($callback)
-        {
-            // here to silence psalm
-        }
-    }
-    if (extension_loaded('swoole') && function_exists('go')) {
-        function coroutine(Closure $task): PromiseInterface
-        {
-            return new Promise(function ($resolve, $reject) use ($task) {
-                go(function () use ($task, $resolve, $reject) {
-                    try {
-                        $resolve($task());
-                    } catch (\Throwable $ex) {
-                        $reject($ex);
-                    }
-                });
-            });
-        }
-    } else {
-        function &queue()
-        {
-            static $queue = null;
-
-            if ($queue === null) {
-                $queue = new class {
-                    /** @var \SplQueue $queue */
-                    private $queue;
-                    public function __construct()
-                    {
-                        $this->queue = new \SplQueue;
-                        $this->queue->setIteratorMode(\SplQueue::IT_MODE_DELETE);
-                    }
-
-                    public function add(Closure $callback)
-                    {
-                        $this->queue->enqueue($callback);
-                    }
-
-                    public function tick(int $count = 1)
-                    {
-                        if ($this->queue->isEmpty()) {
-                            return;
-                        }
-
-                        for ($i = 0; $i < ($count ?: PHP_INT_MAX); $i++) {
-                            if ($this->queue->isEmpty()) {
-                                break;
-                            }
-
-                            $callback = $this->queue->dequeue();
-
-                            $callback();
-                        }
-                    }
-
-                    public function run()
-                    {
-                        while (!$this->queue->isEmpty()) {
-                            $this->tick();
-                        }
-                    }
-                };
-            }
-
-            return $queue;
-        }
-
-        function coroutine(Closure $task): PromiseInterface
-        {
-            return new Promise(function ($resolve, $reject) use ($task) {
-                queue()->add(function () use ($task, $resolve, $reject) {
-                    try {
-                        $resolve($task());
-                    } catch (\Throwable $ex) {
-                        $reject($ex);
-                    }
-                });
-            }, function () {
-                queue()->run();
-            });
-        }
-    }
-}
-
 if (!function_exists(__NAMESPACE__ . '\async')) {
     function async(Closure $callback)
     {
+        return new Promise(function ($resolve, $reject) use ($callback) {
+            coroutine(function () use ($callback, $resolve, $reject) {
+                try {
+                    $resolve($callback());
+                } catch (\Throwable $ex) {
+                    $reject($ex);
+                }
+            });
+        });
         return coroutine($callback);
     }
 }

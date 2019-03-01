@@ -12,6 +12,9 @@
     "autoload-dev": {
         "Promise\\Tests\\": "tests/"
     },
+    "require": {
+        "onion/event-loop": "dev-master"
+    },
     "require-dev": {
         "phpunit/phpunit": "^7.5",
         "infection/infection": "^0.11.5",
