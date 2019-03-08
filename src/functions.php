@@ -16,7 +16,7 @@ if (!function_exists(__NAMESPACE__ . '\is_thenable')) {
 }
 
 if (!function_exists(__NAMESPACE__ . '\async')) {
-    function async(Closure $callback, \Closure $closeFn = null)
+    function async(Closure $callback, Closure $closeFn = null)
     {
         return new Promise(function ($resolve, $reject) use ($callback) {
             coroutine(function () use ($callback, $resolve, $reject) {
@@ -29,6 +29,5 @@ if (!function_exists(__NAMESPACE__ . '\async')) {
         }, function () {
             loop()->tick();
         }, $closeFn);
-        return coroutine($callback);
     }
 }
