@@ -3,6 +3,7 @@ namespace Onion\Framework\Promise;
 
 use Closure;
 use function Onion\Framework\EventLoop\coroutine;
+use function Onion\Framework\EventLoop\loop;
 use Onion\Framework\Promise\Interfaces\ThenableInterface;
 
 if (!function_exists(__NAMESPACE__ . '\is_thenable')) {
@@ -25,6 +26,8 @@ if (!function_exists(__NAMESPACE__ . '\async')) {
                     $reject($ex);
                 }
             });
+        }, function () {
+            loop()->tick();
         });
         return coroutine($callback);
     }
