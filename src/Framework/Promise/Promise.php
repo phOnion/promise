@@ -6,6 +6,7 @@ use Onion\Framework\Promise\Interfaces\PromiseInterface;
 use Onion\Framework\Promise\Interfaces\ThenableInterface;
 use Onion\Framework\Promise\Interfaces\CancelableInterface;
 use Onion\Framework\Promise\Interfaces\WaitableInterface;
+use function Onion\Framework\EventLoop\loop;
 
 class Promise implements
     PromiseInterface,
@@ -281,6 +282,8 @@ class Promise implements
                     $reject($reason);
                 });
             }
+        }, function () {
+            loop()->tick();
         });
 
 
@@ -303,7 +306,9 @@ class Promise implements
      */
     public static function race(iterable $promises): PromiseInterface
     {
-        $promise = new self();
+        $promise = new self(null, function () {
+            loop()->tick();
+        });
 
         foreach ($promises as $index => $item) {
             assert(
