@@ -26,6 +26,8 @@ if (!function_exists(__NAMESPACE__ . '\async')) {
                     $reject($ex);
                 }
             });
+
+            loop()->tick();
         }, function () {
             loop()->tick();
         }, $closeFn);
