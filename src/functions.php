@@ -1,7 +1,6 @@
 <?php
 namespace Onion\Framework\Promise;
 
-use Closure;
 use function Onion\Framework\EventLoop\coroutine;
 use function Onion\Framework\EventLoop\loop;
 use Onion\Framework\Promise\Interfaces\ThenableInterface;
@@ -16,20 +15,18 @@ if (!function_exists(__NAMESPACE__ . '\is_thenable')) {
 }
 
 if (!function_exists(__NAMESPACE__ . '\async')) {
-    function async(Closure $callback, Closure $closeFn = null)
+    function async(callable $callback, callable $closeFn = null, ...$params)
     {
-        return new Promise(function ($resolve, $reject) use ($callback) {
-            coroutine(function () use ($callback, $resolve, $reject) {
+        return new AwaitablePromise(function ($resolve, $reject) use ($callback, $params) {
+            coroutine(function ($callback, $resolve, $reject) use ($params) {
                 try {
-                    $resolve($callback());
+                    $resolve($callback(...$params));
                 } catch (\Throwable $ex) {
                     $reject($ex);
                 }
-            });
-
-            loop()->tick();
+            }, $callback, $resolve, $reject);
         }, function () {
             loop()->tick();
-        }, $closeFn);
+        }, $closeFn ?? function () {});
     }
 }

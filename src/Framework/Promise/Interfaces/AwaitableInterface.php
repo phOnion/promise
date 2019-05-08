@@ -1,7 +1,7 @@
 <?php
 namespace Onion\Framework\Promise\Interfaces;
 
-interface WaitableInterface
+interface AwaitableInterface extends PromiseInterface
 {
     public function await();
 }

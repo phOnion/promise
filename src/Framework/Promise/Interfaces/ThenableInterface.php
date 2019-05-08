@@ -5,5 +5,5 @@ use Closure;
 
 interface ThenableInterface
 {
-    public function then(?Closure $onFulfilled = null, ?Closure $onRejected = null): ThenableInterface;
+    public function then(?callable $onFulfilled = null, ?callable $onRejected = null): ThenableInterface;
 }

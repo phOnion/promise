@@ -1,24 +1,15 @@
 <?php declare(strict_types=1);
 namespace Onion\Framework\Promise;
 
-use Closure;
 use Onion\Framework\Promise\Interfaces\PromiseInterface;
 use Onion\Framework\Promise\Interfaces\ThenableInterface;
 use Onion\Framework\Promise\Interfaces\CancelableInterface;
-use Onion\Framework\Promise\Interfaces\WaitableInterface;
 use function Onion\Framework\EventLoop\loop;
+use function Onion\Framework\EventLoop\coroutine;
 
-class Promise implements
-    PromiseInterface,
-    CancelableInterface,
-    WaitableInterface
+class Promise implements PromiseInterface
 {
-    private const PENDING = 'pending';
-    private const REJECTED = 'rejected';
-    private const FULFILLED = 'fulfilled';
-    private const CANCELLED = 'cancelled';
-
-    private $state = self::PENDING;
+    private $state;
     private $value;
 
     /** @var \SplQueue $fulfilledQueue */
@@ -30,20 +21,13 @@ class Promise implements
     /** @var \SplQueue $finallyQueue */
     private $finallyQueue;
 
-    /** @var \Closure|null $cancelFn */
-    private $cancelFn;
-
-    /** @var \Closure|null $waitFn */
-    private $waitFn;
-
-    public function __construct(?Closure $task = null, ?Closure $wait = null, ?Closure $cancel = null)
+    public function __construct(?callable $task = null)
     {
+        $this->state = static::PENDING;
+
         $this->fulfilledQueue = new \SplQueue();
         $this->rejectedQueue = new \SplQueue();
         $this->finallyQueue = new \SplQueue();
-
-        $this->waitFn = $wait;
-        $this->cancelFn = $cancel;
 
         if ($task !== null) {
             try {
@@ -54,7 +38,7 @@ class Promise implements
                 });
             } catch (\Throwable $ex) {
                 if ($this->isRejected()) {
-                    $this->state = self::PENDING;
+                    $this->state = static::PENDING;
                 }
 
                 $this->reject($ex);
@@ -64,31 +48,25 @@ class Promise implements
 
     private function resolve($value): void
     {
-        $this->settle(self::FULFILLED, $this->fulfilledQueue, $value);
+        $this->settle(static::FULFILLED, $this->fulfilledQueue, $value);
     }
 
     private function reject(\Throwable $ex): void
     {
-        $this->settle(self::REJECTED, $this->rejectedQueue, $ex);
+        $this->settle(static::REJECTED, $this->rejectedQueue, $ex);
     }
 
-    public function cancel(): void
-    {
-        if ($this->isPending()) {
-            $this->state = self::CANCELLED;
-            if ($this->cancelFn instanceof Closure) {
-                ($this->cancelFn)();
-            }
-        }
-    }
-
-    private function getState(): string
+    protected function getState(): string
     {
         return $this->state;
     }
 
     private function settle(string $state, \SplQueue $queue, $result)
     {
+        if ($this->getState() === static::CANCELLED) {
+            return;
+        }
+
         if ($this->getState() !== $state && !$this->isPending()) {
             throw new \LogicException("Promise already {$this->getState()}");
         }
@@ -97,31 +75,29 @@ class Promise implements
         $this->state = $state;
 
         try {
-            if ($queue->isEmpty()) {
+            if ($queue->isEmpty() && !$this->isPending()) {
                 $finally = $this->finallyQueue;
 
                 while (!$finally->isEmpty() && ($callback = $finally->dequeue())) {
-                    $callback();
+                    call_user_func($callback);
                 }
                 return;
             }
-            $callback = $queue->dequeue();
-            $this->value = $callback($this->value) ?? $this->value;
 
-            if ($this->handleResult($this->value)) {
-                if ($this->isPending()) {
-                    return;
-                }
+            $this->handleResult($this->value);
+            if ($this->isPending()) {
+                return;
             }
 
+            $this->value = call_user_func($queue->dequeue(), $this->value) ?? $this->value;
             if ($this->value instanceof \Throwable) {
                 return $this->reject($this->value);
             }
 
-            $this->state = self::PENDING;
+            $this->state = static::PENDING;
             $this->resolve($this->value);
         } catch (\Throwable $ex) {
-            $this->state = self::PENDING;
+            $this->state = static::PENDING;
             $this->reject($ex);
         }
     }
@@ -133,19 +109,19 @@ class Promise implements
         }
 
         if (is_thenable($result)) {
-            $this->state = self::PENDING;
+            $this->state = static::PENDING;
             if ($result instanceof PromiseInterface) {
                 if ($result->isFulfilled()) {
-                    $this->state = self::FULFILLED;
+                    $this->state = static::FULFILLED;
                 }
 
                 if ($result->isRejected()) {
-                    $this->state = self::REJECTED;
+                    $this->state = static::REJECTED;
                 }
 
                 if ($result instanceof CancelableInterface) {
                     if ($result->isCanceled()) {
-                        $this->state = self::CANCELLED;
+                        $this->state = static::CANCELLED;
                     }
                 }
             }
@@ -158,7 +134,7 @@ class Promise implements
         }
 
         if ($result instanceof \Closure) {
-            $this->state = self::PENDING;
+            $this->state = static::PENDING;
             $result(function ($value) {
                 if ($this->isPending()) {
                     $this->resolve($value);
@@ -171,52 +147,35 @@ class Promise implements
         }
     }
 
-    public function await()
-    {
-        if ($this->isPending() && $this->waitFn instanceof Closure) {
-            ($this->waitFn)();
-        }
-
-        if ($this->isFulfilled()) {
-            return $this->value;
-        }
-
-        if ($this->isRejected()) {
-            throw $this->value;
-        }
-
-        throw new \LogicException("Waiting on {$this->getState()} promise failed");
-    }
-
-    public function then(?Closure $onFulfilled = null, ?Closure $onRejected = null): ThenableInterface
+    public function then(?callable $onFulfilled = null, ?callable $onRejected = null): ThenableInterface
     {
         if ($onFulfilled) {
             $this->fulfilledQueue->enqueue($onFulfilled);
         }
 
         if ($this->isFulfilled()) {
-            $this->settle(self::FULFILLED, $this->fulfilledQueue, $this->value);
+            $this->settle(static::FULFILLED, $this->fulfilledQueue, $this->value);
         }
 
         if ($onRejected !== null) {
             $this->otherwise($onRejected);
         }
 
-        return $this;
+        return $this->value instanceof ThenableInterface ? $this->value : $this;
     }
 
-    public function otherwise(Closure $onRejected): PromiseInterface
+    public function otherwise(callable $onRejected): PromiseInterface
     {
 
         $this->rejectedQueue->enqueue($onRejected);
-        if ($this->getState() === self::REJECTED) {
-            $this->settle(self::REJECTED, $this->rejectedQueue, $this->value);
+        if ($this->getState() === static::REJECTED) {
+            $this->settle(static::REJECTED, $this->rejectedQueue, $this->value);
         }
 
         return $this;
     }
 
-    public function finally(Closure ...$callback): PromiseInterface
+    public function finally(callable ...$callback): PromiseInterface
     {
         foreach ($callback as $cb) {
             if ($this->isFulfilled() || $this->isRejected()) {
@@ -232,22 +191,22 @@ class Promise implements
 
     public function isPending(): bool
     {
-        return $this->getState() === self::PENDING;
+        return $this->getState() === static::PENDING;
     }
 
     public function isFulfilled(): bool
     {
-        return $this->getState() === self::FULFILLED;
+        return $this->getState() === static::FULFILLED;
     }
 
     public function isRejected(): bool
     {
-        return $this->getState() === self::REJECTED;
+        return $this->getState() === static::REJECTED;
     }
 
     public function isCanceled(): bool
     {
-        return $this->getState() === self::CANCELLED;
+        return $this->getState() === static::CANCELLED;
     }
 
     /**

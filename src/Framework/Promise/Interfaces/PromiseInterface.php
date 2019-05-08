@@ -5,8 +5,13 @@ use Closure;
 
 interface PromiseInterface extends ThenableInterface
 {
-    public function otherwise(Closure $onRejected): PromiseInterface;
-    public function finally(Closure ...$final): PromiseInterface;
+    public const PENDING = 'pending';
+    public const REJECTED = 'rejected';
+    public const FULFILLED = 'fulfilled';
+    public const CANCELLED = 'cancelled';
+
+    public function otherwise(callable $onRejected): self;
+    public function finally(callable ...$final): self;
 
     public function isPending(): bool;
     public function isFulfilled(): bool;
