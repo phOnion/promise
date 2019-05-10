@@ -67,6 +67,10 @@ class Promise implements PromiseInterface
             return;
         }
 
+        if ($result === $this) {
+            throw new \InvalidArgumentException('Unable to process promise with itself');
+        }
+
         if ($this->getState() !== $state && !$this->isPending()) {
             throw new \LogicException("Promise already {$this->getState()}");
         }
@@ -88,9 +92,11 @@ class Promise implements PromiseInterface
             if ($this->isPending()) {
                 return;
             }
-
             $this->value = call_user_func($queue->dequeue(), $this->value) ?? $this->value;
+            $this->handleResult($this->value);
+
             if ($this->value instanceof \Throwable) {
+                $this->state = static::PENDING;
                 return $this->reject($this->value);
             }
 
@@ -104,10 +110,6 @@ class Promise implements PromiseInterface
 
     private function handleResult(&$result)
     {
-        if ($result === $this) {
-            throw new \InvalidArgumentException('Unable to process promise with itself');
-        }
-
         if (is_thenable($result)) {
             $this->state = static::PENDING;
             if ($result instanceof PromiseInterface) {
@@ -131,19 +133,16 @@ class Promise implements PromiseInterface
             }, function ($reason) {
                 $this->reject($reason);
             });
+            return;
         }
 
-        if ($result instanceof \Closure) {
+        if (is_callable($result)) {
             $this->state = static::PENDING;
-            $result(function ($value) {
-                if ($this->isPending()) {
-                    $this->resolve($value);
-                }
-            }, function ($value) {
-                if ($this->isPending()) {
-                    $this->reject($value);
-                }
-            });
+            call_user_func(
+                $result,
+                function ($value) { $this->resolve($value); },
+                function ($value) { $this->reject($value); }
+            );
         }
     }
 
