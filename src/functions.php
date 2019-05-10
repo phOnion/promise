@@ -20,7 +20,7 @@ if (!function_exists(__NAMESPACE__ . '\async')) {
         return new AwaitablePromise(function ($resolve, $reject) use ($callback, $params) {
             coroutine(function ($callback, $resolve, $reject) use ($params) {
                 try {
-                    $resolve($callback(...$params));
+                    $resolve(call_user_func($callback, ...$params));
                 } catch (\Throwable $ex) {
                     $reject($ex);
                 }
