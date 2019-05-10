@@ -15,7 +15,7 @@ if (!function_exists(__NAMESPACE__ . '\is_thenable')) {
 }
 
 if (!function_exists(__NAMESPACE__ . '\async')) {
-    function async(callable $callback, callable $closeFn = null, ...$params)
+    function async(callable $callback, ?callable $closeFn = null, ...$params)
     {
         return new AwaitablePromise(function ($resolve, $reject) use ($callback, $params) {
             coroutine(function ($callback, $resolve, $reject) use ($params) {
