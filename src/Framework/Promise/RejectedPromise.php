@@ -6,7 +6,7 @@ class RejectedPromise extends Promise
     public function __construct(\Throwable $reason)
     {
         parent::__construct(function ($resolve, $reject) use ($reason) {
-            throw $reason;
+            $reject($reason);
         });
     }
 }

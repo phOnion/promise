@@ -1,14 +1,20 @@
 <?php declare(strict_types=1);
 namespace Onion\Framework\Promise;
 
+use function Onion\Framework\EventLoop\loop;
+use Onion\Framework\Promise\Interfaces\CancelableInterface;
 use Onion\Framework\Promise\Interfaces\PromiseInterface;
 use Onion\Framework\Promise\Interfaces\ThenableInterface;
-use Onion\Framework\Promise\Interfaces\CancelableInterface;
-use function Onion\Framework\EventLoop\loop;
-use function Onion\Framework\EventLoop\coroutine;
 
 class Promise implements PromiseInterface
 {
+    protected const ALLOWED_STATES = [
+        self::PENDING,
+        self::FULFILLED,
+        self::REJECTED,
+        self::CANCELLED,
+    ];
+
     private $state;
     private $value;
 
@@ -23,7 +29,7 @@ class Promise implements PromiseInterface
 
     public function __construct(?callable $task = null)
     {
-        $this->state = static::PENDING;
+        $this->setState(static::PENDING);
 
         $this->fulfilledQueue = new \SplQueue();
         $this->rejectedQueue = new \SplQueue();
@@ -37,10 +43,6 @@ class Promise implements PromiseInterface
                     $this->reject($value);
                 });
             } catch (\Throwable $ex) {
-                if ($this->isRejected()) {
-                    $this->state = static::PENDING;
-                }
-
                 $this->reject($ex);
             }
         }
@@ -61,6 +63,16 @@ class Promise implements PromiseInterface
         return $this->state;
     }
 
+    protected function setState(string $state): void
+    {
+        $this->state = $state;
+    }
+
+    protected function getValue()
+    {
+        return $this->value;
+    }
+
     private function settle(string $state, \SplQueue $queue, $result)
     {
         if ($this->getState() === static::CANCELLED) {
@@ -76,7 +88,12 @@ class Promise implements PromiseInterface
         }
 
         $this->value = $result;
-        $this->state = $state;
+        $this->setState($state);
+
+        $this->handleResult($this->value);
+        if ($this->isPending()) {
+            return;
+        }
 
         try {
             if ($queue->isEmpty() && !$this->isPending()) {
@@ -88,22 +105,16 @@ class Promise implements PromiseInterface
                 return;
             }
 
-            $this->handleResult($this->value);
-            if ($this->isPending()) {
-                return;
-            }
             $this->value = call_user_func($queue->dequeue(), $this->value) ?? $this->value;
-            $this->handleResult($this->value);
 
             if ($this->value instanceof \Throwable) {
-                $this->state = static::PENDING;
-                return $this->reject($this->value);
+                throw $this->value;
             }
 
-            $this->state = static::PENDING;
+            $this->setState(static::PENDING);
             $this->resolve($this->value);
         } catch (\Throwable $ex) {
-            $this->state = static::PENDING;
+            $this->setState(static::PENDING);
             $this->reject($ex);
         }
     }
@@ -111,21 +122,9 @@ class Promise implements PromiseInterface
     private function handleResult(&$result)
     {
         if (is_thenable($result)) {
-            $this->state = static::PENDING;
-            if ($result instanceof PromiseInterface) {
-                if ($result->isFulfilled()) {
-                    $this->state = static::FULFILLED;
-                }
-
-                if ($result->isRejected()) {
-                    $this->state = static::REJECTED;
-                }
-
-                if ($result instanceof CancelableInterface) {
-                    if ($result->isCanceled()) {
-                        $this->state = static::CANCELLED;
-                    }
-                }
+            $this->setState(static::PENDING);
+            if ($result instanceof CancelableInterface && $result->isCanceled()) {
+                $this->setState(static::CANCELLED);
             }
 
             $result->then(function ($value) {
@@ -133,16 +132,16 @@ class Promise implements PromiseInterface
             }, function ($reason) {
                 $this->reject($reason);
             });
-            return;
         }
 
         if (is_callable($result)) {
-            $this->state = static::PENDING;
+            $this->setState(static::PENDING);
             call_user_func(
                 $result,
                 function ($value) { $this->resolve($value); },
                 function ($value) { $this->reject($value); }
             );
+
         }
     }
 
@@ -178,7 +177,7 @@ class Promise implements PromiseInterface
     {
         foreach ($callback as $cb) {
             if ($this->isFulfilled() || $this->isRejected()) {
-                $cb();
+                call_user_func($cb);
                 continue;
             }
 
@@ -203,11 +202,6 @@ class Promise implements PromiseInterface
         return $this->getState() === static::REJECTED;
     }
 
-    public function isCanceled(): bool
-    {
-        return $this->getState() === static::CANCELLED;
-    }
-
     /**
      * Attempt to resolve all promises, if 1 fails
      * the whole promise is rejected with it's reason
@@ -221,7 +215,7 @@ class Promise implements PromiseInterface
         }
 
         /** @var array $promises */
-        $result = new self(function ($resolve, $reject) use ($promises) {
+        return new self(function ($resolve, $reject) use ($promises) {
             $results = [];
             $count = count($promises);
             foreach ($promises as $index => $promise) {
@@ -240,18 +234,7 @@ class Promise implements PromiseInterface
                     $reject($reason);
                 });
             }
-        }, function () {
-            loop()->tick();
         });
-
-
-        $result->then(function ($results): array {
-            ksort($results);
-
-            return $results;
-        });
-
-        return $result;
     }
 
     /**
@@ -264,28 +247,24 @@ class Promise implements PromiseInterface
      */
     public static function race(iterable $promises): PromiseInterface
     {
-        $promise = new self(null, function () {
-            loop()->tick();
-        });
+        $promise = new self();
 
         foreach ($promises as $index => $item) {
             assert(
                 is_thenable($item),
                 new \InvalidArgumentException("Item {$index} is not thenable")
             );
-            if (!$promise->isPending()) {
-                break;
+            if ($promise->isPending()) {
+                $item->then(function ($value) use (&$promise) {
+                    if ($promise->isPending()) {
+                        $promise->resolve($value);
+                    }
+                }, function ($reason) use (&$promise) {
+                    if ($promise->isPending()) {
+                        $promise->reject($reason);
+                    }
+                });
             }
-
-            $item->then(function ($value) use (&$promise) {
-                if ($promise->isPending()) {
-                    $promise->resolve($value);
-                }
-            }, function ($reason) use (&$promise) {
-                if ($promise->isPending()) {
-                    $promise->reject($reason);
-                }
-            });
         }
 
         return $promise;

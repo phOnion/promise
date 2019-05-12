@@ -9,28 +9,28 @@ class AwaitablePromise extends CancelablePromise implements AwaitableInterface
 
     public function __construct(callable $task, callable $waitFn, callable $cancelFn = null)
     {
-        parent::__construct($task, $cancelFn);
         $this->waitFn = $waitFn;
+        parent::__construct($task, $cancelFn ?? function () {});
     }
 
     public function await()
     {
-        if ($this->isPending() && $this->waitFn instanceof Closure) {
+        if ($this->isPending() && is_callable($this->waitFn)) {
             call_user_func($this->waitFn);
 
-            if ($this->value instanceof AwaitableInterface) {
-                return $this->value->await();
+            if ($this->getValue() instanceof AwaitableInterface) {
+                return $this->getValue()->await();
             }
         }
 
         if ($this->isFulfilled()) {
-            return $this->value;
+            return $this->getValue();
         }
 
         if ($this->isRejected()) {
-            throw $this->value;
+            throw $this->getValue();
         }
 
-        throw new \LogicException("Waiting on {$this->getState()} promise failed");
+        throw new \RuntimeException("Waiting on {$this->getState()} promise failed");
     }
 }

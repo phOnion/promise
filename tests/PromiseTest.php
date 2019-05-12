@@ -4,52 +4,58 @@ declare(strict_types=1);
 namespace Promise\Tests;
 
 use Exception;
-use Onion\Framework\Promise\Promise;
+use Onion\Framework\Promise\CancelablePromise;
 use Onion\Framework\Promise\FulfilledPromise;
+use Onion\Framework\Promise\Promise;
 use Onion\Framework\Promise\RejectedPromise;
 
 class PromiseTest extends \PHPUnit\Framework\TestCase
 {
     public function testSuccess()
     {
-        (new FulfilledPromise(1))->then(function ($value) {
+        $promise = (new FulfilledPromise(1))->then(function ($value) {
             return $value + 2;
         })->then(function ($value) {
             $this->assertEquals(3, $value);
         });
-    }
 
+        $this->assertTrue($promise->isFulfilled());
+    }
 
     public function testFail()
     {
-        (new RejectedPromise(new Exception('1')))
+        $promise = (new RejectedPromise(new Exception('1')))
             ->then(null, function (\Throwable $value) {
                 $this->assertInstanceOf(\Exception::class, $value);
                 $this->assertSame('1', $value->getMessage());
             });
-
+        $this->assertTrue($promise->isRejected());
     }
 
     public function testChain()
     {
-        (new FulfilledPromise(1))->then(function ($value) {
+        $promise = (new FulfilledPromise(1))->then(function ($value) {
             return $value + 2;
         })->then(function ($value) {
             return $value + 4;
         })->then(function ($value) {
             $this->assertEquals(7, $value);
         });
+
+        $this->assertTrue($promise->isFulfilled());
     }
 
     public function testChainPromise()
     {
-        (new FulfilledPromise(1))->then(function ($value) {
+        $promise = (new FulfilledPromise(1))->then(function ($value) {
             return new FulfilledPromise(2);
         })->then(function ($value) {
             return ($value + 4);
         })->then(function ($value) {
             $this->assertEquals(6, $value);
         });
+
+        $this->assertTrue($promise->isFulfilled());
     }
 
     public function testRejectedChainPromise()
@@ -61,6 +67,8 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
         })->then(function ($value) {
             $this->assertEquals(6, $value);
         });
+
+        $this->assertTrue($promise->isFulfilled());
     }
 
     public function testRejectedChainPromiseWithThrow()
@@ -72,13 +80,13 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
         })->otherwise(function (\Throwable $ex) {
             $this->assertSame('3', $ex->getMessage());
         });
+
+        $this->assertTrue($promise->isRejected());
     }
 
     public function testChainCallback()
     {
-        $finalValue = 0;
-
-        (new FulfilledPromise(1))->then(function ($value) {
+        $promise = (new FulfilledPromise(1))->then(function ($value) {
             return $value + 2;
         })->then(function ($value)  {
             return function ($resolve, $reject) use ($value) {
@@ -87,6 +95,8 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
         })->then(function ($value) {
             $this->assertSame(6, $value);
         });
+
+        $this->assertTrue($promise->isFulfilled());
     }
 
     public function testChainThenable()
@@ -104,6 +114,8 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
         })->then(function ($value) {
             $this->assertEquals(5, $value);
         });
+
+        $this->assertTrue($promise->isFulfilled());
     }
 
     public function testPendingResult()
@@ -114,17 +126,21 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
         })->then(function ($value) {
             $this->assertEquals(6, $value);
         });
+
+        $this->assertTrue($promise->isFulfilled());
     }
 
     public function testExecutorSuccess()
     {
-        (new Promise(function ($success, $fail) {
+        $promise = (new Promise(function ($success, $fail) {
             $success('hi');
         }))->then(function ($result) {
             return $result;
         })->then(function ($value) {
             $this->assertEquals('hi', $value);
         });
+
+        $this->assertTrue($promise->isFulfilled());
     }
 
     public function testExecutorFail()
@@ -144,7 +160,7 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
 
     public function testRejectTwice()
     {
-        (new Promise(function ($resolve, $reject) {
+        $promise = (new Promise(function ($resolve, $reject) {
             $reject(new Exception('1'));
             $reject(new Exception('2'));
         }))->otherwise(function () {
@@ -152,6 +168,8 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
         })->otherwise(function ($reason) {
             $this->assertSame('2', $reason->getMessage());
         });
+
+        $this->assertTrue($promise->isRejected());
     }
 
     public function testFromFailureHandler()
@@ -168,29 +186,24 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
         });
 
         $this->assertEquals(1, $ok);
-    }
-
-    public function testWaitResolve()
-    {
-        (new FulfilledPromise(1))
-            ->then(function ($value) {
-                $this->assertSame(1, $value);
-            });
+        $this->assertTrue($promise->isRejected());
     }
 
     public function testFulfillRejectedException()
     {
-        (new Promise(function ($resolve, $reject) {
+        $promise = (new Promise(function ($resolve, $reject) {
             $reject(new Exception('1'));
             $resolve(true);
         }))->otherwise(function ($exception) {
             $this->assertInstanceOf(\LogicException::class, $exception);
         });
+
+        $this->assertTrue($promise->isRejected());
     }
 
     public function testFulfillRejected()
     {
-        (new Promise(function ($resolve, $reject) {
+        $promise = (new Promise(function ($resolve, $reject) {
             $reject(new Exception('1'));
             $resolve(true);
         }))->otherwise(function ($reason) {
@@ -198,6 +211,8 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
         })->then(function ($value) {
             $this->assertTrue($value);
         });
+
+        $this->assertTrue($promise->isFulfilled());
     }
 
     public function testSelfResolution()
@@ -207,7 +222,12 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
             return $promise;
         })->otherwise(function ($reason) {
             $this->assertInstanceOf(\InvalidArgumentException::class, $reason);
+            $this->assertSame('Unable to process promise with itself', $reason->getMessage());
+        })->then(function () {
+            $this->fail('exception not thrown');
         });
+
+        $this->assertTrue($promise->isRejected());
     }
 
     public function testWaitRejectedException()
@@ -220,6 +240,8 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
             $this->assertInstanceOf('OutOfBoundsException', $e);
             $this->assertEquals('foo', $e->getMessage());
         });
+
+        $this->assertTrue($promise->isRejected());
     }
 
     public function testFinallyCalls()
@@ -230,36 +252,42 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
                 $t = true;
             });
 
+        $this->assertTrue($promise->isFulfilled());
         $this->assertTrue($t);
     }
 
 
     public function testFulfilledWithClosure()
     {
-        (new FulfilledPromise(1))->then(function () {
-            return function($resolve, $reject) {
-                $resolve(3);
-            };
-        })->then(function ($value) {
-            $this->assertSame(3, $value);
-        });
+        $promise = (new RejectedPromise(new \Exception('1')))
+            ->otherwise(function () {
+                return function($resolve, $reject) {
+                    $resolve(3);
+                };
+            })->then(function ($value) {
+                $this->assertSame(3, $value);
+            });
+
+        $this->assertTrue($promise->isFulfilled());
     }
 
 
     public function testRejectFulfilledFromClosure()
     {
-        (new FulfilledPromise(1))->then(function () {
+        $promise = (new FulfilledPromise(1))->then(function () {
             return function($resolve, $reject) {
                 $reject(new \Exception('1'));
             };
         })->otherwise(function ($reason) {
             $this->assertSame('1', $reason->getMessage());
         });
+
+        $this->assertTrue($promise->isRejected());
     }
 
     public function testRejectFulfilledFromThen()
     {
-        (new FulfilledPromise(1))->then(function () {
+        $promise = (new FulfilledPromise(1))->then(function () {
             return function($resolve, $reject) {
                 $reject(new \Exception('1'));
             };
@@ -268,105 +296,232 @@ class PromiseTest extends \PHPUnit\Framework\TestCase
         })->otherwise(function ($ex) {
             $this->assertSame('2', $ex->getMessage());
         });
+
+        $this->assertTrue($promise->isRejected());
     }
 
     public function testResolveHandledRejectionPromise()
     {
-        (new RejectedPromise(new \Exception('1')))
+        $promise = (new RejectedPromise(new \Exception('1')))
             ->then(null, function () {
                 return true;
             })->then(function ($value) {
                 $this->assertTrue($value);
             });
+
+        $this->assertTrue($promise->isFulfilled());
+    }
+
+    public function testDisallowedStateChange()
+    {
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Promise already fulfilled');
+
+        $promise = (new Promise(function ($resolve, $reject) {
+            $resolve(1);
+            $reject(new \Exception('1'));
+        }));
+
+        $this->assertTrue($promise->isFulfilled());
+    }
+
+    public function testPromiseResolutionWithPendingPromise()
+    {
+        $promise = (new Promise(function ($resolve, $reject) {
+            $resolve(new Promise(function ($resolve) {
+                $resolve(1);
+            }));
+        }))->then(function ($result) {
+            $this->assertSame(1, $result);
+        });
+
+        $this->assertTrue($promise->isFulfilled());
+    }
+
+    public function testPromiseResolutionWithResolvedPromise()
+    {
+        $promise = (new Promise(function ($resolve) {
+            $resolve(new FulfilledPromise(1));
+        }))->then(function ($result) {
+            $this->assertSame(1, $result);
+        });
+
+        $this->assertTrue($promise->isFulfilled());
+    }
+
+    public function testPromiseResolutionWithRejectedPromise()
+    {
+        $promise = (new Promise(function ($resolve) {
+            $resolve(new RejectedPromise(new \Exception('1')));
+        }))->then(function ($result) {
+            var_dump($result);
+        })->otherwise(function ($result) {
+            $this->assertSame('1', $result->getMessage());
+        });
+
+        $this->assertTrue($promise->isRejected());
+    }
+
+    public function testRejectionOfFulfilledPromise()
+    {
+        $promise = (new Promise(function ($resolve) {
+            $resolve(1);
+        }))->then(function () {
+            return 2;
+        })->then(function () {
+            throw new \RuntimeException('foo');
+        });
+
+        $this->assertTrue($promise->isRejected());
+    }
+
+    public function testPromiseResolutionFromThenable()
+    {
+        $promise = (new FulfilledPromise(1))
+            ->then(function () {
+                return new class {
+                    public function then($resolve) {
+                        $resolve(2);
+                    }
+                };
+            })->then(function ($result) {
+                $this->assertSame(2, $result);
+            });
+
+        $this->assertTrue($promise->isFulfilled());
+    }
+
+    public function testPromiseRejectionFromThenable()
+    {
+        $promise = (new FulfilledPromise(1))
+            ->then(function () {
+                return new class {
+                    public function then($resolve, $reject) {
+                        $reject(new \Exception('5'));
+                    }
+                };
+            })->otherwise(function ($reason) {
+                $this->assertSame('5', $reason->getMessage());
+            })->then(function () {
+                var_dump('noe');
+                $this->fail('Nope');
+            });
+
+        $this->assertTrue($promise->isRejected());
     }
 
     public function testStaticRace()
     {
-        for ($i=0; $i<5; $i++) {
-            $stack = [
-                new Promise(),
-                new Promise(),
-                new Promise(),
-                new FulfilledPromise($i),
-                new FulfilledPromise($i+2),
-                new FulfilledPromise($i+1)
-            ];
+        $stack = [
+            new Promise(),
+            new Promise(),
+            new Promise(),
+            new FulfilledPromise(1),
+            new FulfilledPromise(2),
+            new FulfilledPromise(3)
+        ];
 
-            Promise::race($stack)->then(function ($value) use ($i) {
-                $this->assertSame($i, $value);
-            });
-        }
+        $promise = Promise::race($stack)->then(function ($value) {
+            $this->assertSame(1, $value);
+        });
+
+        $this->assertTrue($promise->isFulfilled());
     }
 
     public function testRejectionStaticRace()
     {
-        for ($i=0; $i<5; $i++) {
-            $stack = [
-                new Promise(),
-                new Promise(),
-                new Promise(),
-                new Promise(),
-                new Promise(),
-                new RejectedPromise(new \Exception("{$i}"))
-            ];
+        $stack = [
+            new Promise(),
+            new Promise(),
+            new Promise(),
+            new Promise(),
+            new Promise(),
+            new RejectedPromise(new \Exception('1'))
+        ];
 
-            shuffle($stack);
+        $promise = Promise::race($stack)->otherwise(function ($reason) {
+            $this->assertSame('1', $reason->getMessage());
+        });
 
-            Promise::race($stack)->otherwise(function ($reason) use ($i) {
-                $this->assertSame("{$i}", $reason->getMessage());
-            });
-        }
+        $this->assertTrue($promise->isRejected());
     }
 
     public function testStaticAll()
     {
-        for ($i=0; $i<5; $i++) {
-            $values = [];
-            $expected = [];
-            for ($j=0; $j<6; $j++) {
-                $values[$j] = mt_rand(0, 10);
-            }
-            $stack = [
-                mt_rand(0, 100) => new FulfilledPromise($values[0]),
-                mt_rand(0, 100) => new FulfilledPromise($values[1]),
-                mt_rand(0, 100) => new FulfilledPromise($values[2]),
-                mt_rand(0, 100) => new FulfilledPromise($values[3]),
-                mt_rand(0, 100) => new FulfilledPromise($values[4]),
-                mt_rand(0, 100) => new FulfilledPromise($values[5]),
-            ];
+        $stack = [
+            new FulfilledPromise(1),
+            new FulfilledPromise(2),
+            new FulfilledPromise(3),
+            new FulfilledPromise(4),
+            new FulfilledPromise(5),
+            new FulfilledPromise(6),
+        ];
 
+        foreach ($stack as $index => $item) {
+            $expected[$index] = $index+1;
+        }
 
-            $c = 0;
-            foreach ($stack as $index => $item) {
-                $expected[$index] = $values[$c];
-                $c++;
-            }
-
-            ksort($expected);
-
-            Promise::all($stack)->then(function ($all) use ($expected) {
+        $promise = Promise::all($stack)
+            ->then(function ($all) use ($expected) {
                 $this->assertSame($expected, $all);
             });
-        }
+
+        $this->assertTrue($promise->isFulfilled());
     }
 
     public function testRejectedStaticAll()
     {
-        for ($i=0; $i<5; $i++) {
-            $stack = [
-                new FulfilledPromise(1),
-                new FulfilledPromise(1),
-                new FulfilledPromise(1),
-                new FulfilledPromise(1),
-                new FulfilledPromise(1),
-                new RejectedPromise(new \Exception("{$i}"))
-            ];
+        $stack = [
+            new FulfilledPromise(1),
+            new FulfilledPromise(1),
+            new FulfilledPromise(1),
+            new FulfilledPromise(1),
+            new FulfilledPromise(1),
+            new RejectedPromise(new \Exception('1'))
+        ];
 
-            shuffle($stack);
+        $promise = Promise::all($stack)->otherwise(function ($reason) {
+            $this->assertSame('1', $reason->getMessage());
+        });
 
-            Promise::all($stack)->otherwise(function ($reason) use ($i) {
-                $this->assertSame("{$i}", $reason->getMessage());
-            });
-        }
+        $this->assertTrue($promise->isRejected());
+    }
+
+    public function testResolvedWithCanceledPromise()
+    {
+        $promise = (new Promise(function ($resolve) {
+            $p = new CancelablePromise(function () {}, function () {});
+            $p->cancel();
+
+            $resolve($p);
+        }));
+
+        $this->assertFalse($promise->isPending());
+        $this->assertFalse($promise->isFulfilled());
+        $this->assertFalse($promise->isRejected());
+    }
+
+    public function testFinally()
+    {
+        $this->expectOutputString('foobar');
+        $c = null;
+        (new Promise(function ($resolve) use (&$c) {
+            $c = new class($resolve) {
+                private $r;
+
+                public function __construct(callable $resolve)
+                {
+                    $this->r = $resolve;
+                }
+
+                public function test()
+                {
+                    call_user_func($this->r, 1);
+                }
+            };
+        }))->then(function () { echo 'foo'; })
+            ->finally(function () { echo 'bar'; });
+
+        $c->test();
     }
 }

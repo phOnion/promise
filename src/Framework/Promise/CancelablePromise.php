@@ -7,7 +7,6 @@ use Onion\Framework\Promise\Promise;
 class CancelablePromise extends Promise implements CancelableInterface
 {
     private $cancelFn;
-    private $state;
 
     public function __construct(callable $task, callable $cancelFn)
     {
@@ -23,11 +22,9 @@ class CancelablePromise extends Promise implements CancelableInterface
 
     public function cancel(): void
     {
-        if ($this->isPending()) {
-            $this->state = static::CANCELLED;
-            if ($this->cancelFn !== null) {
-                call_user_func($this->cancelFn);
-            }
+        $this->setState(static::CANCELLED);
+        if ($this->cancelFn !== null) {
+            call_user_func($this->cancelFn);
         }
     }
 }
