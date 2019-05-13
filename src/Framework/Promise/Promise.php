@@ -205,6 +205,11 @@ class Promise implements PromiseInterface
         return $this->getState() === static::REJECTED;
     }
 
+    public function catch(callable $handler): self
+    {
+        return $this->otherwise($handler);
+    }
+
     /**
      * Attempt to resolve all promises, if 1 fails
      * the whole promise is rejected with it's reason
