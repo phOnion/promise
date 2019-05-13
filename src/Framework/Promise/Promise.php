@@ -37,7 +37,7 @@ class Promise implements PromiseInterface
 
         if ($task !== null) {
             try {
-                $task(function ($value): void {
+                call_user_func($task, function ($value): void {
                     $this->resolve($value);
                 }, function (\Throwable $value): void {
                     $this->reject($value);
