@@ -138,10 +138,13 @@ class Promise implements PromiseInterface
             $this->setState(static::PENDING);
             call_user_func(
                 $result,
-                function ($value) { $this->resolve($value); },
-                function ($value) { $this->reject($value); }
+                function ($value) {
+                    $this->resolve($value);
+                },
+                function ($value) {
+                    $this->reject($value);
+                }
             );
-
         }
     }
 

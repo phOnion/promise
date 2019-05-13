@@ -27,6 +27,7 @@ if (!function_exists(__NAMESPACE__ . '\async')) {
             }, $callback, $resolve, $reject);
         }, function () {
             loop()->tick();
-        }, $closeFn ?? function () {});
+        }, $closeFn ?? function () {
+        });
     }
 }

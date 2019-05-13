@@ -10,7 +10,8 @@ class AwaitablePromise extends CancelablePromise implements AwaitableInterface
     public function __construct(callable $task, callable $waitFn, callable $cancelFn = null)
     {
         $this->waitFn = $waitFn;
-        parent::__construct($task, $cancelFn ?? function () {});
+        parent::__construct($task, $cancelFn ?? function () {
+        });
     }
 
     public function await()
