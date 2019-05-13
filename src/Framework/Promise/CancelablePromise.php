@@ -24,6 +24,10 @@ class CancelablePromise extends Promise implements CancelableInterface
     {
         $this->setState(static::CANCELLED);
         if ($this->cancelFn !== null) {
+            if ($this->getValue() instanceof CancelableInterface) {
+                $this->getValue()->cancel();
+            }
+
             call_user_func($this->cancelFn);
         }
     }
