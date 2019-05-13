@@ -45,6 +45,7 @@ if (!function_exists(__NAMESPACE__ . '\promise')) {
                     $reject($ex);
                 }
             }, $task, $params);
-        }, $cancel ?? function() {});
+        }, $cancel ?? function () {
+        });
     }
 }
