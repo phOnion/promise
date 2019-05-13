@@ -17,7 +17,7 @@ if (!function_exists(__NAMESPACE__ . '\is_thenable')) {
 }
 
 if (!function_exists(__NAMESPACE__ . '\async')) {
-    function async(callable $callback, callable $waitFn, ?callable $closeFn = null, ...$params)
+    function async(callable $callback, ?callable $waitFn = null, ?callable $closeFn = null, ...$params)
     {
         return new AwaitablePromise(function ($resolve, $reject) use ($callback, $params) {
             coroutine(function ($callback, $resolve, $reject) use ($params) {
@@ -28,7 +28,6 @@ if (!function_exists(__NAMESPACE__ . '\async')) {
                 }
             }, $callback, $resolve, $reject);
         }, function () use ($waitFn) {
-            loop()->tick();
             call_user_func($waitFn ?? [loop(), 'tick']);
         }, $closeFn ?? function () {
         });
