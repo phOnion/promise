@@ -1,7 +1,6 @@
 <?php declare(strict_types=1);
 namespace Onion\Framework\Promise;
 
-use function Onion\Framework\EventLoop\loop;
 use Onion\Framework\Promise\Interfaces\CancelableInterface;
 use Onion\Framework\Promise\Interfaces\PromiseInterface;
 use Onion\Framework\Promise\Interfaces\ThenableInterface;
