@@ -10,7 +10,9 @@
         ]
     },
     "autoload-dev": {
-        "Promise\\Tests\\": "tests/"
+        "psr-4": {
+            "Promise\\Tests\\": "tests/"
+        }
     },
     "require-dev": {
         "roave/security-advisories": "dev-master",
