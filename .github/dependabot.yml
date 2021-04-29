@@ -1,0 +1,21 @@
+version: 2
+updates:
+- package-ecosystem: composer
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: infection/infection
+    versions:
+    - 0.21.0
+    - 0.21.1
+    - 0.21.2
+    - 0.21.3
+    - 0.21.4
+    - 0.21.5
+  - dependency-name: vimeo/psalm
+    versions:
+    - 4.4.0
+    - 4.5.0
+    - 4.6.0
