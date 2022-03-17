@@ -3,16 +3,16 @@
     "source": {
         "directories": [
             "src"
+        ],
+        "excludes": [
+            "Test/TestCase.php"
         ]
     },
     "phpUnit": {
         "configDir": "."
     },
     "logs": {
-        "text": "infection.build.log",
-        "badge": {
-            "branch": "master"
-        }
+        "text": "infection.build.log"
     },
     "mutators": {
         "@default": true
