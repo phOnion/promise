@@ -1,0 +1,31 @@
+name: CI
+on: push
+jobs:
+  run:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        php: ["8.1", "8.2"]
+        ts: ["ts", "nts"]
+    steps:
+      - name: Lint
+        uses: shivammathur/setup-php@2.17.1
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: xdebug
+          tools: phpcs, psalm
+        env:
+          fail-fast: true
+          phpts: ${{ matrix.ts }}
+          update: true
+      - name: Test
+        uses: shivammathur/setup-php@2.17.1
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: xdebug
+          tools: phpunit, infection
+        env:
+          fail-fast: true
+          phpts: ${{ matrix.ts }}
+          update: true
