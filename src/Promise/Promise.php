@@ -85,6 +85,7 @@ class Promise implements PromiseInterface
 
     private function invoke(State $state, callable $fn): void
     {
+        tick();
         try {
             $this->doResolve(
                 Closure::fromCallable($fn)(match ($state) {
