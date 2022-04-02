@@ -138,4 +138,44 @@ class Promise implements PromiseInterface
     {
         return new static(fn (callable $_, callable $reject): mixed => $reject($ex));
     }
+
+    public static function all(PromiseInterface ...$promises): static
+    {
+        return new static(function ($resolve, $reject) use (&$promises) {
+            $result = [];
+            $total = count($promises);
+            foreach ($promises as $idx => $promise) {
+                $promise->then(function ($value) use ($total, $idx, &$result, &$resolve) {
+                    $result[$idx] = $value;
+
+                    if (count($result) === $total) {
+                        $resolve($result);
+                    }
+
+                    return $value;
+                }, $reject);
+            }
+        });
+    }
+
+    public static function race(PromiseInterface ...$promises): static
+    {
+        return new static(function ($resolve, $reject) use (&$promises) {
+            $resolved = false;
+
+            foreach ($promises as $promise) {
+                $promise->then(function ($value) use (&$resolve, &$resolved) {
+                    if (!$resolved) {
+                        $resolve($value);
+                        $resolved = true;
+                    }
+                }, function ($ex) use (&$reject, &$resolved) {
+                    if (!$resolved) {
+                        $reject($ex);
+                        $resolved = true;
+                    }
+                });
+            }
+        });
+    }
 }

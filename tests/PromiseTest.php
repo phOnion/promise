@@ -349,82 +349,73 @@ class PromiseTest extends TestCase
             }));
     }
 
-    // public function testStaticRace()
-    // {
-    //     $stack = [
-    //         new Promise(),
-    //         new Promise(),
-    //         new Promise(),
-    //         Promise::resolve(1),
-    //         Promise::resolve(2),
-    //         Promise::resolve(3)
-    //     ];
+    public function testStaticRace()
+    {
+        $stack = [
+            new Promise(fn () => null),
+            new Promise(fn () => null),
+            new Promise(fn () => null),
+            Promise::resolve(1),
+            Promise::resolve(2),
+            Promise::resolve(3)
+        ];
 
-    //     $promise = Promise::race($stack)->then(function ($value) {
-    //         $this->assertSame(1, $value);
-    //     });
+        $this->assertSame(1, await(Promise::race(...$stack)));
+    }
 
-    //     $this->assertTrue($promise->isFulfilled());
-    // }
+    public function testRejectionStaticRace()
+    {
+        $stack = [
+            new Promise(fn () => null),
+            new Promise(fn () => null),
+            new Promise(fn () => null),
+            new Promise(fn () => null),
+            new Promise(fn () => null),
+            Promise::reject(new \Exception('1'))
+        ];
 
-    // public function testRejectionStaticRace()
-    // {
-    //     $stack = [
-    //         new Promise(),
-    //         new Promise(),
-    //         new Promise(),
-    //         new Promise(),
-    //         new Promise(),
-    //         Promise::reject(new \Exception('1'))
-    //     ];
 
-    //     $promise = Promise::race($stack)->catch(function ($reason) {
-    //         $this->assertSame('1', $reason->getMessage());
-    //     });
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('1');
 
-    //     $this->assertTrue($promise->isRejected());
-    // }
+        await(Promise::race(...$stack));
+    }
 
-    // public function testStaticAll()
-    // {
-    //     $stack = [
-    //         Promise::resolve(1),
-    //         Promise::resolve(2),
-    //         Promise::resolve(3),
-    //         Promise::resolve(4),
-    //         Promise::resolve(5),
-    //         Promise::resolve(6),
-    //     ];
+    public function testStaticAll()
+    {
+        $stack = [
+            Promise::resolve(1),
+            Promise::resolve(2),
+            Promise::resolve(3),
+            Promise::resolve(4),
+            Promise::resolve(5),
+            Promise::resolve(6),
+        ];
 
-    //     foreach ($stack as $index => $item) {
-    //         $expected[$index] = $index + 1;
-    //     }
+        foreach ($stack as $index => $item) {
+            $expected[$index] = $index + 1;
+        }
 
-    //     $promise = Promise::all($stack)
-    //         ->then(function ($all) use ($expected) {
-    //             $this->assertSame($expected, $all);
-    //         });
+        $this->assertSame($expected, await(Promise::all(...$stack)));
+    }
 
-    //     $this->assertTrue($promise->isFulfilled());
-    // }
+    public function testRejectedStaticAll()
+    {
+        $stack = [
+            Promise::resolve(1),
+            Promise::resolve(1),
+            Promise::resolve(1),
+            Promise::resolve(1),
+            Promise::resolve(1),
+            Promise::reject(new \Exception('1'))
+        ];
 
-    // public function testRejectedStaticAll()
-    // {
-    //     $stack = [
-    //         Promise::resolve(1),
-    //         Promise::resolve(1),
-    //         Promise::resolve(1),
-    //         Promise::resolve(1),
-    //         Promise::resolve(1),
-    //         Promise::reject(new \Exception('1'))
-    //     ];
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('1');
+        await(Promise::all(...$stack));
 
-    //     $promise = Promise::all($stack)->catch(function ($reason) {
-    //         $this->assertSame('1', $reason->getMessage());
-    //     });
-
-    //     $this->assertTrue($promise->isRejected());
-    // }
+        // $this->assertTrue($promise->isRejected());
+    }
 
     // public function testResolvedWithCanceledPromise()
     // {
