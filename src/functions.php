@@ -2,9 +2,11 @@
 
 namespace Onion\Framework\Promise;
 
+use Closure;
 use InvalidArgumentException;
 use Onion\Framework\Loop\Interfaces\SchedulerInterface;
 use Onion\Framework\Loop\Interfaces\TaskInterface;
+use Onion\Framework\Promise\Interfaces\PromiseInterface;
 use Onion\Framework\Promise\Interfaces\ThenableInterface;
 
 use function Onion\Framework\Loop\signal;
@@ -17,6 +19,18 @@ if (!function_exists(__NAMESPACE__ . '\is_thenable')) {
     }
 }
 
+if (!function_exists(__NAMESPACE__ . '\async')) {
+    function async(Closure $fn): PromiseInterface
+    {
+        return new Promise(function (Closure $resolve, Closure $reject) use (&$fn): void {
+            try {
+                $resolve($fn());
+            } catch (\Throwable $ex) {
+                $reject($ex);
+            }
+        });
+    }
+}
 
 if (!function_exists(__NAMESPACE__ . '\await')) {
     function await(mixed $promise): mixed
