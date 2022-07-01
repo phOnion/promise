@@ -22,11 +22,11 @@ class Promise implements PromiseInterface
 
     private readonly SplQueue $queue;
 
-    final public function __construct(callable $fn)
+    final public function __construct(Closure $fn)
     {
         $this->queue = new \SplQueue();
 
-        coroutine(function (callable $resolve, callable $reject) use (&$fn) {
+        coroutine(function (Closure $resolve, Closure $reject) use (&$fn) {
             try {
                 $fn($resolve, $reject);
             } catch (Throwable $ex) {
@@ -83,12 +83,11 @@ class Promise implements PromiseInterface
         }
     }
 
-    private function invoke(State $state, callable $fn): void
+    private function invoke(State $state, Closure $fn): void
     {
-        tick();
         try {
             $this->doResolve(
-                Closure::fromCallable($fn)(match ($state) {
+                ($fn)(match ($state) {
                     State::FULFILLED => $this->value,
                     State::REJECTED => $this->exception,
                 })
@@ -98,7 +97,7 @@ class Promise implements PromiseInterface
         }
     }
 
-    public function then(callable $onFulfilled = null, callable $onRejected = null): static
+    public function then(Closure $onFulfilled = null, Closure $onRejected = null): static
     {
         if ($onFulfilled) {
             $this->queue->enqueue([State::FULFILLED, $onFulfilled]);
@@ -113,12 +112,12 @@ class Promise implements PromiseInterface
         return $this;
     }
 
-    public function catch(callable $onRejected): static
+    public function catch(Closure $onRejected): static
     {
         return $this->then(null, $onRejected);
     }
 
-    public function finally(callable $onFinally): static
+    public function finally(Closure $onFinally): static
     {
         $wrapper = function (mixed $value) use (&$onFinally): mixed {
             call_user_func($onFinally);
@@ -131,12 +130,12 @@ class Promise implements PromiseInterface
 
     public static function resolve(mixed $value): static
     {
-        return new static(fn (callable $resolve): mixed => $resolve($value));
+        return new static(fn (Closure $resolve): mixed => $resolve($value));
     }
 
     public static function reject(Throwable $ex): static
     {
-        return new static(fn (callable $_, callable $reject): mixed => $reject($ex));
+        return new static(fn (Closure $_, Closure $reject): mixed => $reject($ex));
     }
 
     public static function all(PromiseInterface ...$promises): static
