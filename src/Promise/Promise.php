@@ -27,6 +27,7 @@ class Promise implements PromiseInterface
         $this->queue = new \SplQueue();
 
         coroutine(function (Closure $resolve, Closure $reject) use (&$fn) {
+            tick();
             try {
                 $fn($resolve, $reject);
             } catch (Throwable $ex) {
@@ -78,7 +79,8 @@ class Promise implements PromiseInterface
             [$when, $fn] = $this->queue->dequeue();
 
             if ($when === $state) {
-                $this->invoke($state, $fn);
+                coroutine($this->invoke(...), [$state, $fn]);
+                break;
             }
         }
     }
