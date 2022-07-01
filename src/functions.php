@@ -44,7 +44,6 @@ if (!function_exists(__NAMESPACE__ . '\await')) {
 
         return signal(function (callable $resume, TaskInterface $task, SchedulerInterface $scheduler) use ($promise) {
             $promise
-
                 ->then(
                     $resume,
                     function (\Throwable $ex) use ($task, $scheduler) {
