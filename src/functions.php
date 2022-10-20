@@ -6,6 +6,7 @@ use Closure;
 use InvalidArgumentException;
 use Onion\Framework\Loop\Interfaces\SchedulerInterface;
 use Onion\Framework\Loop\Interfaces\TaskInterface;
+use Onion\Framework\Promise\Interfaces\DeferredInterface;
 use Onion\Framework\Promise\Interfaces\PromiseInterface;
 use Onion\Framework\Promise\Interfaces\ThenableInterface;
 
@@ -52,5 +53,12 @@ if (!function_exists(__NAMESPACE__ . '\await')) {
                     }
                 );
         });
+    }
+}
+
+if (!function_exists(__NAMESPACE__ . '\defer')) {
+    function defer(): DeferredInterface
+    {
+        return new Deferred();
     }
 }
