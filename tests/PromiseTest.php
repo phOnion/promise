@@ -371,7 +371,8 @@ class PromiseTest extends TestCase
             new Promise(fn () => null),
             new Promise(fn () => null),
             new Promise(fn () => null),
-            Promise::reject(new \Exception('1'))
+            Promise::reject(new \Exception('1')),
+            Promise::reject(new \Exception('2')),
         ];
 
 
