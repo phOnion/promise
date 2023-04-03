@@ -28,5 +28,10 @@
   "scripts": {
     "fix": "phpcbf --standard=psr12 src/",
     "lint": "phpcs --standard=psr12 src/"
+  },
+  "config": {
+    "allow-plugins": {
+      "infection/extension-installer": true
+    }
   }
 }
