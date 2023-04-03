@@ -70,8 +70,8 @@ class Deferred implements DeferredInterface
         }
     }
 
-    public function complete(): bool
+    public function completed(): bool
     {
-        return $this->complete
+        return $this->complete;
     }
 }
