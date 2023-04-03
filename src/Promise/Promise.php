@@ -24,7 +24,7 @@ class Promise implements PromiseInterface
 
     final public function __construct(Closure $fn)
     {
-        $this->queue = new \SplQueue();
+        $this->queue = new SplQueue();
 
         coroutine(function (Closure $resolve, Closure $reject) use (&$fn) {
             tick();
@@ -94,7 +94,7 @@ class Promise implements PromiseInterface
                     State::REJECTED => $this->exception,
                 })
             );
-        } catch (\Throwable $ex) {
+        } catch (Throwable $ex) {
             $this->doReject($ex);
         }
     }
