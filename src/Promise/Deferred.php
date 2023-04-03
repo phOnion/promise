@@ -33,8 +33,8 @@ class Deferred implements DeferredInterface
                 }
             }
 
-            $this->resolveFn = $resolve;
-            $this->rejectFn = $reject;
+            $this->resolveFn ??= $resolve;
+            $this->rejectFn ??= $reject;
         });
     }
 
@@ -68,5 +68,10 @@ class Deferred implements DeferredInterface
         if (isset($this->rejectFn)) {
             ($this->rejectFn)($this->exception);
         }
+    }
+
+    public function complete(): bool
+    {
+        return $this->complete
     }
 }
